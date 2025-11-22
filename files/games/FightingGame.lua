@@ -243,7 +243,6 @@ do -- // Setup Leaderboard Spectate
 end;
 
 do --// Notifier
-    local ToastNotif = sharedRequires['ToastNotif'];
     local moderatorIDs = {283890177,421391593,5127995337,42235130,1001242712,56721213,38307780,138249029,1041867508,95410360,1459923763,1696452029,150269473,1321098453,45453121,276142024,123755248,585228735,3489954641}
     local asset = "rbxassetid://367453005"
     local modJoinSound = Instance.new("Sound")
