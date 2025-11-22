@@ -433,6 +433,7 @@ do -- // Functions
     end
 
     local cutsczene = false
+    getgenv().StartedDungeon = false;
 
     function functions.AutoFarmMob(toggle)
          if (not toggle) then 
@@ -448,13 +449,19 @@ do -- // Functions
             local gates = workspace:FindFirstChild("Gates")
             if not gates then return end
 
-            for _, gate in ipairs(gates:GetDescendants()) do
-                if gate:IsA("BasePart") and gate.Name == "Gate1" then
-                    firetouchinterest(myRootPart, gate, 0)
-                    task.wait(0.05)
-                    firetouchinterest(myRootPart, gate, 1)
+            if (not getgenv().StartedDungeon) then
+                for _, gate in ipairs(gates:GetDescendants()) do
+                    if gate:IsA("BasePart") and gate.Name == "Gate1" then
+                        firetouchinterest(myRootPart, gate, 0)
+                        task.wait(0.1)
+                        firetouchinterest(myRootPart, gate, 1)
+
+                        getgenv().StartedDungeon = true;
+                    end
                 end
-            end
+            end;    
+            
+            repeat task.wait() until getgenv().StartedDungeon;
 
             local MobFolder = workspace:WaitForChild("WalkingNPC")
                 
