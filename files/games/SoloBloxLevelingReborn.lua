@@ -97,10 +97,12 @@ local DropEvent = getKey('DropEvent')
 
 -- // Dungeon Extra
 
-local DungeonHelper = {
-    ["D-Rank"] = { ["PlaceID"] = {125357995526125,127569336430170}, ["MobsName"] = {'KARDING','HORIDONG','MAGICARABAO'} },
-    ["C-Rank"] = { ["PlaceID"] = {83492604633635,71377998784000}, ["MobsName"] = {'WOLFANG','METALIC FANG','DAREWOLF','MONKEYKONG','UNDERWORLD SERPENT', 'FANGORA', 'RAGNOK', 'TWINKLE', 'DARKFIRE', 'GOBLINS TYRANT'} },
-}
+local DungeonNameToPlaceID = {
+    ['Prison [D Rank]'] = 125357995526125,
+    ['Rock [D Rank]'] = 127569336430170,
+    ['Subway [C Rank]'] = 83492604633635,
+    ['Goblin [C Rank]'] = 71377998784000,
+};
 
 -- Goblin - 71377998784000
 -- subway - 83492604633635
@@ -225,27 +227,30 @@ do -- // Functions
         end;
     end;
 
-     function functions.StartSelectedDungeon()
+    function functions.StartSelectedDungeon()
         local dungeon, rank = functions.GetRandomDungeon(getgenv().SelectedDungeons or {});
-        if not rank then
+        if not rank or not dungeon then
             warn('No dungeon selected or invalid selection.');
             return;
         end;
 
-        local placeIDs = functions.DungeonStats(rank);
-        if not placeIDs or #placeIDs == 0 then
-            warn('No PlaceIDs found for rank:', rank);
+        -- Get the exact PlaceID for this dungeon
+        local placeID = DungeonNameToPlaceID[dungeon];
+        if not placeID then
+            warn('No PlaceID found for dungeon:', dungeon);
             return;
         end;
 
+        -- Call createDungeon with a single PlaceID
         functions.createDungeon(
             LocalPlayer.UserId,
             getgenv().SelectedDifficulty or 'Hard',
             nil,
-            placeIDs,
+            {placeID}, -- wrap in a table since createDungeon expects a table
             rank
         );
     end;
+
 
     function functions.GetHoverPosition(mobPos)
         local method = getgenv().HoverMethod or "Normal"
