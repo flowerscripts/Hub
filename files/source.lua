@@ -34,7 +34,7 @@ local Utility = sharedRequire('utils/Utility.lua');
 local _ = sharedRequire('utils/prettyPrint.lua');
 
 local Players, TeleportService, ScriptContext, MemStorageService, HttpService, ReplicatedStorage = Services:Get('Players', 'TeleportService', 'ScriptContext', 'MemStorageService', 'HttpService', 'ReplicatedStorage');
-print('services loaded')
+
 local BLOODLINES_MAIN_PLACE = 10266164381;
 local BLOODLINES = 1946714362;
 
@@ -73,8 +73,6 @@ end;
 local LocalPlayer = Players.LocalPlayer
 local executed = false;
 
-print('hello')
-
 if (debugMode) then
     getgenv().debugMode = debugMode;
 
@@ -91,12 +89,8 @@ if (debugMode) then
     }
 end;
 
-print('after hello')
-
 local supportedGamesList = HttpService:JSONDecode(customRequire('gameList.json'));
 local gameName = supportedGamesList[tostring(game.GameId)];
-
-print('game list')
 
 --//Base library
 
@@ -106,7 +100,6 @@ for _, v in next, getconnections(LocalPlayer.Idled) do
 end;
 
 --//Load special game Hub
-print('before special')
 local window;
 local column1;
 local column2;
@@ -129,7 +122,6 @@ if (gameName) then
 	library.window = window;
 end;
 
-print('load')
 
 local myScriptId = debug.info(1, 's');
 local seenErrors = {};
