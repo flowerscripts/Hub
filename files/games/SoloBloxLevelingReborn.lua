@@ -279,6 +279,26 @@ do -- // Functions
         return placeIDs;
     end;
 
+    function functions.ExtractSelectedDungeons(selectedTable)
+        local selectedList = {};
+        for key, isSelected in pairs(selectedTable) do
+            local dungeonName;
+            
+            -- Handle nested table keys
+            if type(key) == "table" then
+                dungeonName = key[1]; -- get the string inside the table
+            else
+                dungeonName = key;
+            end;
+
+            if isSelected and dungeonName then
+                table.insert(selectedList, dungeonName);
+            end;
+        end
+        return selectedList;
+    end
+
+
 
     function functions.HitMob(MobRoot)
         if not (MobRoot and MobRoot.Parent) then return end
@@ -600,7 +620,7 @@ do -- // Auto Farm Section
     autofarmsection:AddDivider('Teleport to Dungeon');
 
 
-        autofarmsection:AddList({
+    autofarmsection:AddList({
         text = 'Select Dungeon',
         values = {
             'Prison [D Rank]',
@@ -609,13 +629,11 @@ do -- // Auto Farm Section
             'Goblin [C Rank]',
         },
         multiselect = true,
-        callback = function(value)
-            getgenv().SelectedDungeons = value;
-            print(HttpService:JSONEncode(value));
+        callback = function(selectedTable)
+            getgenv().SelectedDungeons = functions.ExtractSelectedDungeons(selectedTable);
+            print('Selected dungeons:', HttpService:JSONEncode(getgenv().SelectedDungeons));
         end;
     });
-
-
 
     autofarmsection:AddList({
         text = 'Dungeon Difficulty',
