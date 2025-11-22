@@ -90,7 +90,7 @@ if (debugMode) then
     }
 end;
 
-local supportedGamesList = HttpService:JSONDecode(sharedRequire('gameList.json'));
+local supportedGamesList = HttpService:JSONDecode(customRequire('gameList.json'));
 local gameName = supportedGamesList[tostring(game.GameId)];
 
 --//Base library
@@ -330,3 +330,4 @@ end);
 
 
 getgenv().ah_loaded = true;
+
