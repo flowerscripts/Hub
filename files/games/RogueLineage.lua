@@ -153,28 +153,31 @@ do -- // Download Assets
     local apiEndpoint = USE_INSECURE_ENDPOINT and 'http://test.aztupscripts.xyz' or 'https://aztupscripts.xyz';
 
     for i, v in next, assetsList do
-        if(not isfile(string.format('Rukia Hub V1/%s', v))) then
+        if(not isfile(string.format('Rukia Hub V1/sounds/%s', v))) then
             print('Downloading', v, '...');
-            writefile(string.format('Rukia Hub V1/%s', v), game:HttpGet(string.format('%s/%s', apiEndpoint, v)));
+            writefile(string.format('Rukia Hub V1/sounds/%s', v), game:HttpGet(string.format('%s/%s', apiEndpoint, v)));
         end;
 
-        assets[v] = getcustomasset(string.format('Rukia Hub V1/%s', v));
+        --assets[v] = getcustomasset(string.format('Rukia Hub V1/sounds/%s', v));
     end;
 
     function loadSound(soundName)
-        local sound = Instance.new('Sound');
-        sound.SoundId = assets[soundName];
-        sound.Volume = 1;
-        sound.Parent = game:GetService('CoreGui');
+        if (assets[soundName]) then
+            local sound = Instance.new('Sound');
+            sound.SoundId = assets[soundName];
+            sound.Volume = 1;
+            sound.Parent = game:GetService('CoreGui');
 
-        sound:Play();
+            sound:Play();
 
-        task.delay(4, function()
-            sound:Destroy();
-        end);
+            task.delay(4, function()
+                sound:Destroy();
+            end);
+        end;
     end;
 end;
 
+print('analytics')
 do -- // Mod Ban Analytics
     local disconnectedPlayers = {};
     local sentUserIds = false;
@@ -224,6 +227,8 @@ do -- // Mod Ban Analytics
     Players.PlayerRemoving:Connect(onPlayerRemoving);
 end;
 
+print('slimed out')
+
 local function fromHex(str)
     return (str:gsub('..', function (cc)
         return string.char(tonumber(cc, 16));
@@ -234,6 +239,8 @@ end;
 
 local cipherIV = fromHex('f25cbb355f61317ce02de60cb81168ea');
 local cipherKey = fromHex('90cf0e772789b4a244076a352cce2fa3eb1a18898dc4612c14fbd033f3320b2c');
+
+print('alr bro')
 
 local chatLogger = TextLogger.new({
 	title = 'Chat Logger',
@@ -260,6 +267,8 @@ do -- // Functions
     -- LocalPlayer:Kick();
     -- game:GetService('GuiService'):ClearError();
 
+    print('oh uh')
+
     local collectorUI;
     local apiEndpoint = USE_INSECURE_ENDPOINT and 'http://test.aztupscripts.xyz/api/v1/' or 'https://aztupscripts.xyz/api/v1/';
 
@@ -268,12 +277,16 @@ do -- // Functions
         Headers = {['X-API-Key'] = websiteScriptKey}
     }).Body;
 
+    print('mlurrpy')
+
     moderatorIds = crypto.custom.decrypt(
         'aes-cbc',
         crypt.base64.encode(moderatorIds),
         cipherKey,
         cipherIV
     );
+
+    print('glurpy')
 
     local injuryObjects = {'Careless', 'PsychoInjury', 'MindWarp', 'NoControl', 'Maniacal', 'BrokenLeg', 'BrokenArm', 'VisionBlur'};
 
@@ -293,6 +306,8 @@ do -- // Functions
     local mobEspBase = createBaseESP('mobEsp', mobs);
     local npcEspBase = createBaseESP('npcEsp', npcs);
     local bagEspBase = createBaseESP('bagEsp', bags);
+
+    print('bet king')
 
     local moderatorInGame = false;
     local sprinting = false;
@@ -321,6 +336,8 @@ do -- // Functions
         end;
     end;
 
+    print('yum ingredients')
+
     local function getPlayerStats(player)
         if(isGaia) then
             return player:GetAttribute('FirstName') or 'Unknown', player:GetAttribute('LastName') or 'Unknown';
@@ -337,6 +354,8 @@ do -- // Functions
         end;
     end;
 
+
+    print('got stats')
     local function chargeMana()
         if(not manaCharge) then return end;
 
@@ -347,6 +366,8 @@ do -- // Functions
         end;
     end;
 
+    print('charegd mana')
+
     local function dechargeMana()
         if(not manaCharge) then return end;
 
@@ -356,6 +377,8 @@ do -- // Functions
             manaCharge.FireServer(manaCharge, false);
         end;
     end
+
+    print('degharaged')
 
     local function canUseMana()
         local character = LocalPlayer.Character;
@@ -375,6 +398,8 @@ do -- // Functions
 
         return true;
     end;
+
+    print('can use heh')
 
     local function makeNotification(title, text)
         return ToastNotif.new({text = title .. ' - ' .. text})
