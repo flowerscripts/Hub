@@ -104,7 +104,7 @@ local library = sharedRequire('UILibrary.lua');
 				end;
 			end);
 
-			originalFunctions.runOnActor(actor, sharedRequire('createBaseESPParallel.lua'), commId or commEvent);
+			originalFunctions.runOnActor(actor, sharedRequire('utils/createBaseESPParallel.lua'), commId or commEvent);
 			table.insert(actors, {
 				actor = actor,
 				commEvent = commEvent
@@ -127,7 +127,7 @@ local library = sharedRequire('UILibrary.lua');
 			end;
 		end);
 
-		loadstring(sharedRequire('createBaseESPParallel.lua'))(commId);
+		loadstring(sharedRequire('utils/createBaseESPParallel.lua'))(commId);
 
 		table.insert(actors, {commEvent = commEvent});
 		readyCount = 1;
