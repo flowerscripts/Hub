@@ -443,34 +443,30 @@ do -- // Functions
 
         getgenv().autoFarmMob = true
 
-        local gatesFolder = workspace:WaitForChild("Gates")
-        local passedGates = {} -- track which gates were touched
-
-        -- Define gate sequence in order
-        local gateSequence = {"Gate1", "Gate2", "Gate3", "Gate4", "Gate5"}
-
         while getgenv().autoFarmMob do
             task.wait(0.05)
 
-            -- Start dungeon if not started
+            local gates = workspace:FindFirstChild("Gates")
+            if not gates then return end
+
+            -- Start dungeon if not already started
             if not getgenv().StartedDungeon then
-                local gate1 = gatesFolder:FindFirstChild("Gate1")
-                if gate1 then
-                    firetouchinterest(myRootPart, gate1, 0)
-                    task.wait(0.1)
-                    firetouchinterest(myRootPart, gate1, 1)
-                    passedGates["Gate1"] = true
-                    getgenv().StartedDungeon = true
+                for _, gate in ipairs(gates:GetDescendants()) do
+                    if gate:IsA("BasePart") and gate.Name == "Gate1" then
+                        firetouchinterest(myRootPart, gate, 0)
+                        task.wait(0.1)
+                        firetouchinterest(myRootPart, gate, 1)
+                        getgenv().StartedDungeon = true
+                    end
                 end
             end
 
-            -- Wait until dungeon started
             repeat task.wait() until getgenv().StartedDungeon
 
             -- Handle mobs
-            local mobFolder = workspace:WaitForChild("WalkingNPC")
+            local MobFolder = workspace:WaitForChild("WalkingNPC")
             local foundMob = false
-            for _, model in ipairs(mobFolder:GetChildren()) do
+            for _, model in ipairs(MobFolder:GetChildren()) do
                 if model:IsA("Highlight") then continue end
                 local mob = model:FindFirstChild("HumanoidRootPart")
                 if mob and model.Name == "Mobs5" and not cutscene then
@@ -503,31 +499,33 @@ do -- // Functions
                 myRootPart.CFrame = oldCFrame
             end
 
-            -- Sequential gate handling
-            if getgenv().StartedDungeon then
-                for i, gateName in ipairs(gateSequence) do
-                    if passedGates[gateName] then continue end
-
-                    local gate = gatesFolder:FindFirstChild(gateName)
-                    if not gate then
-                        -- Skip this gate if it doesn't exist
-                        passedGates[gateName] = true
-                        continue
+            -- If no mobs found, wait a few times before going to boss
+            if not foundMob and not cutscene and getgenv().StartedDungeon then
+                local noMobCounter = 0
+                while noMobCounter < 15 and not foundMob do
+                    task.wait(0.35) -- roughly 5 seconds total (0.35*15 ≈ 5.25s)
+                    
+                    -- Check again for mobs
+                    foundMob = false
+                    for _, model in ipairs(MobFolder:GetChildren()) do
+                        if model:IsA("Highlight") then continue end
+                        local mob = model:FindFirstChild("HumanoidRootPart")
+                        if mob then
+                            foundMob = true
+                            break
+                        end
                     end
 
-                    -- Wait until previous gate exists AND has been passed
-                    local prevIndex = i - 1
-                    local prevGate = prevIndex >= 1 and gateSequence[prevIndex] or nil
-                    if prevGate and gatesFolder:FindFirstChild(prevGate) and not passedGates[prevGate] then
-                        break -- wait for previous gate to be passed
-                    end
+                    noMobCounter = noMobCounter + 1
+                end
 
-                    -- Touch current gate
-                    firetouchinterest(myRootPart, gate, 0)
-                    task.wait(0.1)
-                    firetouchinterest(myRootPart, gate, 1)
-                    passedGates[gateName] = true
-                    task.wait(1)
+                -- If still no mobs, go to boss/final gate
+                if not foundMob then
+                    local finalGate = gates:FindFirstChild("Gate5") or gates:FindFirstChild("Gate4")
+                    if finalGate and not workspace:FindFirstChild("CloseRank") then
+                        myRootPart.CFrame = CFrame.new(finalGate.Position)
+                        task.wait(10)
+                    end
                 end
             end
         end
@@ -779,7 +777,7 @@ do -- // Auto Farm Section
         end;
     });
 
-    autofarmsection:AddToggle({
+     autofarmsection:AddToggle({
         text = "Auto Collect Drops",
         callback = function(state)
             getgenv().AutoCollect = state
