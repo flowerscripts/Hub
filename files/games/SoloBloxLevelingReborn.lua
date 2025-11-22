@@ -505,25 +505,29 @@ do -- // Functions
 
             -- Sequential gate handling
             if getgenv().StartedDungeon then
-                for _, gateName in ipairs(gateSequence) do
-                    if passedGates[gateName] then continue end -- skip already passed
+                for i, gateName in ipairs(gateSequence) do
+                    if passedGates[gateName] then continue end
 
                     local gate = gatesFolder:FindFirstChild(gateName)
-                    if gate then
-                        -- Wait until previous gate is passed
-                        local prevIndex = table.find(gateSequence, gateName) - 1
-                        local prevGate = prevIndex >= 1 and gateSequence[prevIndex] or nil
-                        if prevGate and not passedGates[prevGate] then
-                            break -- wait for previous gate to be passed
-                        end
-
-                        -- Touch current gate
-                        firetouchinterest(myRootPart, gate, 0)
-                        task.wait(0.1)
-                        firetouchinterest(myRootPart, gate, 1)
+                    if not gate then
+                        -- Skip this gate if it doesn't exist
                         passedGates[gateName] = true
-                        task.wait(1)
+                        continue
                     end
+
+                    -- Wait until previous gate exists AND has been passed
+                    local prevIndex = i - 1
+                    local prevGate = prevIndex >= 1 and gateSequence[prevIndex] or nil
+                    if prevGate and gatesFolder:FindFirstChild(prevGate) and not passedGates[prevGate] then
+                        break -- wait for previous gate to be passed
+                    end
+
+                    -- Touch current gate
+                    firetouchinterest(myRootPart, gate, 0)
+                    task.wait(0.1)
+                    firetouchinterest(myRootPart, gate, 1)
+                    passedGates[gateName] = true
+                    task.wait(1)
                 end
             end
         end
