@@ -249,6 +249,22 @@ do -- // Functions
         end
     end
 
+    function functions.GetRandomDungeon(selectedDungeons)
+        if (#selectedDungeons == 0) then return nil, nil; end;
+
+        local dungeon = selectedDungeons[math.random(1, #selectedDungeons)];
+        local rank = dungeon:match('%[(.-)%]'); -- e.g., "D Rank" or "C Rank"
+        if (rank) then
+            rank = rank:gsub(' ', '-'); -- convert to "D-Rank" / "C-Rank"
+            if (DungeonHelper[rank]) then
+                return dungeon, rank;
+            end;
+        end;
+
+        return nil, nil;
+    end;
+
+
     function functions.GetSelectedPlaceIDs(selectedDungeons)
         local placeIDs = {};
         for _, dungeon in ipairs(selectedDungeons) do
@@ -646,18 +662,22 @@ do -- // Auto Farm Section
 
     autofarmsection:AddButton({
         text = 'Create & Start Dungeon',
-        tip = 'Teleports to a custom made dungeon.',
+        tip = 'Teleports to a random selected dungeon.',
         callback = function()
-            local placeIDs = functions.GetSelectedPlaceIDs(getgenv().SelectedDungeons);
+            local dungeon, rank = functions.GetRandomDungeon(getgenv().SelectedDungeons or {});
+            if (not rank) then return; end;
+
+            local placeIDs = functions.DungeonStats(rank);
             functions.createDungeon(
                 LocalPlayer.UserId,
                 getgenv().SelectedDifficulty,
                 nil,
                 placeIDs,
-                getgenv().SelectedRank
+                rank
             );
         end;
     });
+
 
 
 end;
