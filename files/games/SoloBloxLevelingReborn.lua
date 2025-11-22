@@ -574,6 +574,21 @@ do -- // Auto Farm Section
         end;
     })
 
+     autofarmsection:AddList({
+        text = 'Select Dungeon',
+        values = {
+            'Prison [D Rank]',
+            'Rock [D Rank]',
+            'Subway [C Rank]',
+            'Goblin [C Rank]',
+        },
+		multiselect = true,
+
+        callback = function(value)
+            print(value);
+        end;
+    })
+
 
     autofarmsection:AddList({
         text = 'Dungeon Difficulty',
@@ -614,4 +629,3 @@ do -- // Auto Farm Section
 	}); 
 
 end;
-
