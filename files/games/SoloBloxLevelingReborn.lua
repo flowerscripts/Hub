@@ -14,6 +14,7 @@ local EntityESP = sharedRequire('classes/EntityESP.lua');
 local ControlModule = sharedRequire('classes/ControlModule.lua');
 local ToastNotif = sharedRequire('classes/ToastNotif.lua');
 
+local prettyPrint = sharedRequire('utils/prettyPrint.lua');
 local BlockUtils = sharedRequire('utils/BlockUtils.lua');
 local TextLogger = sharedRequire('classes/TextLogger.lua');
 local fromHex = sharedRequire('utils/fromHex.lua');
@@ -629,4 +630,3 @@ do -- // Auto Farm Section
 	}); 
 
 end;
-
