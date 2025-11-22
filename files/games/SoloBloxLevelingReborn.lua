@@ -585,7 +585,7 @@ do -- // Auto Farm Section
 		multiselect = true,
 
         callback = function(value)
-            print(value);
+            prettyPrint(value);
         end;
     })
 
