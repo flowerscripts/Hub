@@ -97,12 +97,34 @@ local DropEvent = getKey('DropEvent')
 
 -- // Dungeon Extra
 
-local DungeonNameToPlaceID = {
-    ['Prison [D Rank]'] = 125357995526125,
-    ['Rock [D Rank]'] = 127569336430170,
-    ['Subway [C Rank]'] = 83492604633635,
-    ['Goblin [C Rank]'] = 71377998784000,
+local DungeonHelper = {
+    ['D-Rank'] = {
+        ['Prison'] = {
+            PlaceID = 125357995526125,
+            Mobs = {'KARDING','HORIDONG','MAGICARABAO'}
+        },
+        ['Rock'] = {
+            PlaceID = 127569336430170,
+            Mobs = {'KARDING','HORIDONG','MAGICARABAO'}
+        }
+    },
+    ['C-Rank'] = {
+        ['Subway'] = {
+            PlaceID = 83492604633635,
+            Mobs = {'WOLFANG','METALIC FANG','DAREWOLF','MONKEYKONG','UNDERWORLD SERPENT'}
+        },
+        ['Goblin'] = {
+            PlaceID = 71377998784000,
+            Mobs = {'FANGORA','RAGNOK','TWINKLE','DARKFIRE','GOBLINS TYRANT'}
+        }
+    }
 };
+
+
+-- local DungeonHelper = {
+--     ["D-Rank"] = { ["PlaceID"] = {125357995526125,127569336430170}, ["MobsName"] = {'KARDING','HORIDONG','MAGICARABAO'} },
+--     ["C-Rank"] = { ["PlaceID"] = {83492604633635,71377998784000}, ["MobsName"] = {'WOLFANG','METALIC FANG','DAREWOLF','MONKEYKONG','UNDERWORLD SERPENT', 'FANGORA', 'RAGNOK', 'TWINKLE', 'DARKFIRE', 'GOBLINS TYRANT'} },
+-- }
 
 -- Goblin - 71377998784000
 -- subway - 83492604633635
@@ -178,34 +200,37 @@ do -- // Functions
         until not library.flags.infiniteJump;
     end;
     
-    function functions.DungeonStats(Rank)
-        -- If rank is provided, return PlaceID table
-        if (Rank and DungeonHelper[Rank] and DungeonHelper[Rank].PlaceID) then
-            return DungeonHelper[Rank].PlaceID;
-        end;
+    -- Returns the PlaceID for a given dungeon name and rank
+    function functions.DungeonStats(rank, dungeonName)
+        if rank and dungeonName and DungeonHelper[rank] and DungeonHelper[rank][dungeonName] then
+            return DungeonHelper[rank][dungeonName].PlaceID;
+        end
 
-        -- Otherwise, try to detect rank from mobs in workspace
+        -- If no dungeonName provided, try to detect rank from mobs in workspace
         local MobFolder = workspace:WaitForChild('WalkingNPC');
         for _, mob in ipairs(MobFolder:GetChildren()) do
-            if (mob:IsA('Highlight')) then continue; end;
-            if (mob:FindFirstChild('HumanoidRootPart') and mob.HumanoidRootPart:FindFirstChild('Health') and mob.HumanoidRootPart.Health:FindFirstChild('ImageLabel')) then
-                local tag = mob.HumanoidRootPart.Health.ImageLabel:FindFirstChild('TextLabel');
-                if (tag) then
+            if mob:IsA('Highlight') then continue; end;
+            local root = mob:FindFirstChild('HumanoidRootPart');
+            if root and root:FindFirstChild('Health') and root.Health:FindFirstChild('ImageLabel') then
+                local tag = root.Health.ImageLabel:FindFirstChild('TextLabel');
+                if tag then
                     local mobName = tostring(tag.Text);
-                    if (table.find(DungeonHelper['D-Rank'].MobsName, mobName)) then
-                        getgenv().DungeonRank = 'D-Rank';
-                        return DungeonHelper['D-Rank'].PlaceID;
-                    elseif (table.find(DungeonHelper['C-Rank'].MobsName, mobName)) then
-                        getgenv().DungeonRank = 'C-Rank';
-                        return DungeonHelper['C-Rank'].PlaceID;
-                    end;
-                end;
-            end;
-        end;
+                    for r, dungeons in pairs(DungeonHelper) do
+                        for dName, info in pairs(dungeons) do
+                            if table.find(info.Mobs, mobName) then
+                                getgenv().DungeonRank = r;
+                                return info.PlaceID;
+                            end
+                        end
+                    end
+                end
+            end
+        end
 
         -- fallback
-        return {};
+        return nil;
     end;
+
 
     function functions.createDungeon(UserID, Difficulty, Level, PlaceIdTable, DungeonRank)
         local TeleportArguments = {
@@ -227,26 +252,25 @@ do -- // Functions
         end;
     end;
 
+     -- Starts a random selected dungeon
     function functions.StartSelectedDungeon()
         local dungeon, rank = functions.GetRandomDungeon(getgenv().SelectedDungeons or {});
-        if not rank or not dungeon then
+        if not dungeon or not rank then
             warn('No dungeon selected or invalid selection.');
             return;
-        end;
+        end
 
-        -- Get the exact PlaceID for this dungeon
-        local placeID = DungeonNameToPlaceID[dungeon];
+        local placeID = functions.DungeonStats(rank, dungeon);
         if not placeID then
             warn('No PlaceID found for dungeon:', dungeon);
             return;
-        end;
+        end
 
-        -- Call createDungeon with a single PlaceID
         functions.createDungeon(
             LocalPlayer.UserId,
             getgenv().SelectedDifficulty or 'Hard',
             nil,
-            {placeID}, -- wrap in a table since createDungeon expects a table
+            {placeID}, -- wrap in table because createDungeon expects a table
             rank
         );
     end;
@@ -276,40 +300,19 @@ do -- // Functions
     end
 
     function functions.GetRandomDungeon(selectedDungeons)
-        if not selectedDungeons or next(selectedDungeons) == nil then
-            return nil, nil;
-        end;
+        if (#selectedDungeons == 0) then return nil, nil; end;
 
-        -- Flatten the table in case keys are tables or boolean values
-        local dungeonList = {};
-        for key, isSelected in pairs(selectedDungeons) do
-            local dungeonName;
-            if type(key) == 'table' then
-                dungeonName = key[1];
-            else
-                dungeonName = key;
-            end;
-            if isSelected and dungeonName then
-                table.insert(dungeonList, dungeonName);
-            end;
-        end
-
-        if #dungeonList == 0 then
-            return nil, nil;
-        end;
-
-        local dungeon = dungeonList[math.random(1, #dungeonList)];
-        local rank = dungeon:match('%[(.-)%]');
-        if rank then
-            rank = rank:gsub(' ', '-'); -- "C Rank" -> "C-Rank"
-            if DungeonHelper[rank] then
+        local dungeon = selectedDungeons[math.random(1, #selectedDungeons)];
+        local rank = dungeon:match('%[(.-)%]'); -- e.g., "D Rank" or "C Rank"
+        if (rank) then
+            rank = rank:gsub(' ', '-'); -- convert to "D-Rank" / "C-Rank"
+            if (DungeonHelper[rank]) then
                 return dungeon, rank;
             end;
         end;
 
         return nil, nil;
     end;
-
 
 
     function functions.GetSelectedPlaceIDs(selectedDungeons)
