@@ -86,6 +86,7 @@ local function getKey(name)
     end;
 end;
 
+
 -- // Remotes
 
 local GateEvent = getKey('GateEvent');
@@ -94,7 +95,10 @@ local MageEvent = getKey('Mage');
 local AttackEvent = getKey('Mage_Combat_Event');
 local DamageEvent = getKey('Mage_Combat_Damage_Event');
 local SkillEvent = getKey('Mage_Skill_Event');
-local DropEvent = getKey('DropEvent')
+local DropEvent = getKey('DropEvent');
+
+local DropFolder = workspace:WaitForChild('DropItem');
+
 
 -- // Dungeon Extra
 
@@ -231,6 +235,22 @@ do -- // Functions
         -- fallback
         return nil;
     end;
+
+    function functions.Collect(dropModel)
+        if not dropModel then return end
+        local prompt = dropModel.Rotate.Attachment.ProximityPrompt
+        prompt.MaxActivationDistance = math.huge
+        if not prompt then return end
+        local args = {
+            "Drop_Item",
+            LocalPlayer,
+            dropModel,        
+            dropModel.Name, 
+            prompt        
+        }
+
+        DropEvent:FireServer(unpack(args))
+    end
 
 
     function functions.createDungeon(UserID, Difficulty, Level, PlaceIdTable, DungeonRank)
@@ -712,11 +732,11 @@ do -- // Auto Farm Section
         text = 'Auto Start Dungeon',
         tip = 'Put script within Auto Execute.',
         callback = function(value)
-            if value and game.PlaceId == 119482438738938 then -- city
+            if (value and game.PlaceId == 119482438738938) then -- city
                 functions.fly(true);
                 myRootPart.CFrame = CFrame.new(200, -100, 200);
                 task.wait(5);
-                if value then
+                if (value) then
                     functions.StartSelectedDungeon();
                 end;
             end;
@@ -730,6 +750,33 @@ do -- // Auto Farm Section
             functions.StartSelectedDungeon();
         end;
     });
+
+    autofarmsection:AddToggle({
+        text = "Auto Collect Drops",
+        callback = function(state)
+            getgenv().AutoCollect = state
+            if not getgenv().AutoCollect then
+                if getgenv().DropConnection then
+                    getgenv().DropConnection:Disconnect()
+                    getgenv().DropConnection = nil
+                end
+                return
+            end
+            getgenv().DropConnection = DropFolder.ChildAdded:Connect(function(drop)
+                if getgenv().AutoCollect then
+                    task.wait(0.05) 
+                    Collect(drop)
+                end
+            end)
+            while getgenv().AutoCollect do task.wait(0.5)
+                for _, drop in next, DropFolder:GetChildren() do
+                    if drop:IsA("Model") then
+                        Collect(drop)
+                    end
+                end
+            end
+        end
+    })
 end;
 
 do -- // Helper Section
