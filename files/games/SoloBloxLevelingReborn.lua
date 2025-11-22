@@ -789,13 +789,13 @@ do -- // Auto Farm Section
             getgenv().DropConnection = DropFolder.ChildAdded:Connect(function(drop)
                 if getgenv().AutoCollect then
                     task.wait(0.05) 
-                    Collect(drop)
+                    functions.Collect(drop)
                 end
             end)
             while getgenv().AutoCollect do task.wait(0.5)
                 for _, drop in next, DropFolder:GetChildren() do
                     if drop:IsA("Model") then
-                        Collect(drop)
+                        functions.Collect(drop)
                     end
                 end
             end
