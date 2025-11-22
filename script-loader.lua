@@ -661,7 +661,7 @@ xpcall(function()
     requireTOS(function()
         xpcall(function()
             setStatus('Launching script');
-            getgenv().require('source.lua');
+            sharedRequire('source.lua');
             setStatus('Script successfully loaded!', true);
          end, function(err)
             logError(err .. ' ' .. crypt.base64.encode(scriptContent:sub(1, 50)));
@@ -671,4 +671,5 @@ xpcall(function()
 end, function(err)
     logError(err);
     setStatus(err, true);
+
 end);
