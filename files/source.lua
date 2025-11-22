@@ -158,8 +158,8 @@ end;
 
 local universalLoadAt = tick();
 
-require('games/Universal/ESP.lua');
-require('games/Universal/Aimbot.lua');
+sharedRequire('games/Universal/ESP.lua');
+sharedRequire('games/Universal/Aimbot.lua');
 
 print(string.format('[Script] [Universal] Took %.02f to load', tick() - universalLoadAt));
 
@@ -327,5 +327,6 @@ task.spawn(function()
 		return commandCallback(target);
 	end);
 end);
+
 
 getgenv().ah_loaded = true;
