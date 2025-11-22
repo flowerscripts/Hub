@@ -74,6 +74,7 @@ local entityEspList = {};
 local localcheats = column1:AddSection('Local Cheats');
 local combatcheats = column1:AddSection('Combat Cheats');
 local autofarmsection = column2:AddSection('Auto Farm');
+local helpersection = column2:AddSection('Helpers');
 
 
 -- // #Slop
@@ -729,4 +730,16 @@ do -- // Auto Farm Section
             functions.StartSelectedDungeon();
         end;
     });
+end;
+
+do -- // Helper Section
+    helpersection:AddDivider('Teleports');
+
+    helpersection:AddButton({
+        text = 'Return to City',
+        tip = 'Teleports to the city',
+        callback = function()
+            TeleportService:Teleport(119482438738938, LocalPlayer);
+        end;
+    })
 end;
