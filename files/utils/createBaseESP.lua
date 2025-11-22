@@ -53,7 +53,7 @@ local library = sharedRequire('UILibrary.lua');
 	local readyCount = 0;
 	local broadcastEvent = Instance.new('BindableEvent');
 
-	local supportedGamesList = HttpService:JSONDecode(require('gameList.json'));
+	local supportedGamesList = HttpService:JSONDecode(customRequire('gameList.json'));
 	local gameName = supportedGamesList[tostring(game.GameId)];
 
 	if (playerScriptsLoader) then
