@@ -241,13 +241,6 @@ local cipherIV = fromHex('f25cbb355f61317ce02de60cb81168ea');
 local cipherKey = fromHex('90cf0e772789b4a244076a352cce2fa3eb1a18898dc4612c14fbd033f3320b2c');
 
 print('alr bro')
-
-local chatLogger = TextLogger.new({
-	title = 'Chat Logger',
-	preset = 'chatLogger',
-	buttons = {'Spectate', 'Copy Username', 'Copy User Id', 'Copy Text', 'Report User'}
-});
-
 do -- // Functions
     local tango;
     local fallDamage;
@@ -904,66 +897,6 @@ do -- // Functions
         end;
     end;
 
-    do -- // Chat Logger
-        local function containBlacklistedWord(text)
-            text = string.lower(text);
-            local blacklistedWords = {'cheater', 'hacker', 'exploiter', 'hack', 'cheat', 'exploit', 'report', string.lower(LocalPlayer.Name)}
-            for i, v in next, blacklistedWords do
-                if(string.find(text, v)) then
-                    return true;
-                end;
-            end;
-
-            return false;
-        end;
-
-        local function addText(player, ignName, message)
-            local time = os.date('%H:%M:%S')
-            local prefixBase = string.format('[%s] [%s] - %s', time, ignName or 'Unknwon', message);
-            local prefixHover = string.format('[%s] [%s] - %s', time, player == LocalPlayer and 'You' or player.Name, message);
-            local color = Color3.fromRGB(255, 255, 255);
-
-            local originalText = string.format('[%s] [%s] [%s] %s', time, player.Name, ignName, message); -- Better version for report system
-
-            if(illusionists[player]) then
-                color = Color3.fromRGB(230, 126, 34);
-            end;
-
-            if(allMods[player] or not player.Character or containBlacklistedWord(message)) then
-                color = Color3.fromRGB(231, 76, 60);
-
-                if(not player.Character) then
-                    prefixBase = '[Not Spawned In] ' .. prefixBase;
-                    prefixHover = '[Not Spawned In] ' .. prefixHover;
-                end;
-            end;
-
-            local textObject = chatLogger:AddText({
-                color = color,
-                player = player,
-                text = prefixBase,
-                originalText = originalText, -- Used for report system cause Rogue is special with mouseenter and mouseleave
-            });
-
-            textObject.OnMouseEnter:Connect(function()
-                textObject:SetText(prefixHover);
-            end);
-
-            textObject.OnMouseLeave:Connect(function()
-                textObject:SetText(prefixBase);
-            end);
-        end;
-
-        chatLogger.OnPlayerChatted:Connect(function(player, message)
-            if (not player or not message) then return end;
-
-            local firstName, lastName = getPlayerStats(player);
-            local playerFullName = firstName .. (lastName ~= "" and " " .. lastName or "");
-
-            addText(player, playerFullName, message);
-        end);
-    end;
-
     do -- // Captcha Bypass
         local function readCSG(union)
             local unionData = select(2, getpcdprop(union));
@@ -1443,7 +1376,6 @@ do -- // Functions
                     end;
 
                     ToastNotif:DestroyAll();
-                    library.options.chatLogger:SetState(false);
                 end;
             end);
 
@@ -4632,10 +4564,6 @@ do -- // Functions
         end;
     end;
 
-    function chatLoggerSetEnabled(state)
-        chatLogger:SetVisible(state);
-    end;
-
     function removeKillBricks(toggle)
         if(not toggle) then
             maid.removeKillBricks = nil;
@@ -6093,8 +6021,6 @@ Main:AddToggle({text = 'Infinite Jump', callback = infiniteJump}):AddSlider({fla
 });
 
 
-Main:AddToggle({text = 'Chat Logger', callback = chatLoggerSetEnabled});
-Main:AddToggle({text = 'Chat Logger Auto Scroll'})
 Main:AddToggle({text = 'Spell Stacking', callback = spellStacking});
 
 Removals:AddToggle({text = 'Remove Kill Bricks', callback = removeKillBricks});
