@@ -589,9 +589,8 @@ function functions.antiVoidFire(toggle)
     end;
 
     maid.antiVoidFire = RunService.Heartbeat:Connect(function()
-            if (LocalPlayer.Character:FindFirstChild('VoidFire')) then
-                LocalPlayer.Character:FindFirstChild('VoidFire'):Destroy();
-            end;
+        if (LocalPlayer.Character:FindFirstChild('VoidFire')) then
+            LocalPlayer.Character:FindFirstChild('VoidFire'):Destroy();
         end;
     end);
 end;
@@ -603,9 +602,8 @@ function functions.antiConfused(toggle)
     end;
 
     maid.antiConfused = RunService.Heartbeat:Connect(function()
-            if (LocalPlayer.Character:FindFirstChild('Confused')) then
-                LocalPlayer.Character:FindFirstChild('Confused'):Destroy();
-            end;
+        if (LocalPlayer.Character:FindFirstChild('Confused')) then
+            LocalPlayer.Character:FindFirstChild('Confused'):Destroy();
         end;
     end);
 end;
@@ -617,9 +615,8 @@ function functions.antiHeal(toggle)
     end;
 
     maid.antiHeal = RunService.Heartbeat:Connect(function()
-            if (LocalPlayer.Character:FindFirstChild('NoAbsoluteHeal')) then
-                LocalPlayer.Character:FindFirstChild('NoAbsoluteHeal'):Destroy();
-            end;
+        if (LocalPlayer.Character:FindFirstChild('NoAbsoluteHeal')) then
+            LocalPlayer.Character:FindFirstChild('NoAbsoluteHeal'):Destroy();
         end;
     end);
 end;
@@ -631,9 +628,8 @@ function functions.noFallDamage(toggle)
     end;
 
     maid.antiHeal = RunService.Heartbeat:Connect(function()
-            if (ReplicatedStorage:FindFirstChild('FallDamage')) then
-                ReplicatedStorage:FindFirstChild('FallDamage'):Destroy();
-            end;
+        if (ReplicatedStorage:FindFirstChild('FallDamage')) then
+            ReplicatedStorage:FindFirstChild('FallDamage'):Destroy();
         end;
     end);
 end;
@@ -645,9 +641,8 @@ function functions.noBlur(toggle)
     end;
 
     maid.noBlur = RunService.Heartbeat:Connect(function()
-            if (Lighting:FindFirstChild('rawr')) then
-                Lighting:FindFirstChild('rawr'):Destroy();
-            end;
+        if (Lighting:FindFirstChild('rawr')) then
+            Lighting:FindFirstChild('rawr'):Destroy();
         end;
     end);
 end;
@@ -1062,3 +1057,5 @@ do -- // Inventory Viewer (SMH)
         callback = showPlayerInventory
     });
 end
+
+-- hi
