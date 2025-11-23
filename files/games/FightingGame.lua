@@ -534,6 +534,124 @@ function functions.FindOutWeather()
     });
 end;
 
+function functions.noStun(toggle)
+    if(not toggle) then
+        maid.noStun = nil;
+        return;
+    end;
+
+    maid.noStun = RunService.Heartbeat:Connect(function()
+        if(LocalPlayer.Character) then
+            if(LocalPlayer.Character.Values.Running.Value) then
+                LocalPlayer.Humanoid.WalkSpeed = 26;
+            else
+                LocalPlayer.Humanoid.WalkSpeed = 16;
+            end;
+        end;
+    end);
+end;
+
+function functions.blatantNoStun(toggle)
+    if(not toggle) then
+        maid.blatantNoStun = nil;
+        return;
+    end;
+
+    maid.blatantNoStun = RunService.Heartbeat:Connect(function()
+        if(LocalPlayer.Character) then
+            LocalPlayer.Character.Humanoid.WalkSpeed = 26
+        end;
+    end);
+end;
+
+function functions.antiFire(toggle)
+    if(not toggle) then
+        maid.antiFire = nil;
+        return;
+    end;
+
+    maid.antiFire = RunService.Heartbeat:Connect(function()
+        if(LocalPlayer.Character.Values.OnFire.Value) then
+            local args = { 
+                [1] = Enum.KeyCode.S,
+                [2] = CFrame.new(1804.400390625, 7528.03076171875, -2765.593505859375) * CFrame.Angles(-2.143744468688965, -1.2413746118545532, -2.1692001819610596),
+                [3] = {}
+            }
+            game:GetService("ReplicatedStorage").Dash:FireServer(unpack(args))
+        end;
+    end);
+end;
+
+function functions.antiVoidFire(toggle)
+    if(not toggle) then
+         maid.antiVoidFire = nil;
+        return;
+    end;
+
+    maid.antiVoidFire = RunService.Heartbeat:Connect(function()
+            if (LocalPlayer.Character:FindFirstChild('VoidFire')) then
+                LocalPlayer.Character:FindFirstChild('VoidFire'):Destroy();
+            end;
+        end;
+    end);
+end;
+
+function functions.antiConfused(toggle)
+    if(not toggle) then
+         maid.antiConfused = nil;
+        return;
+    end;
+
+    maid.antiConfused = RunService.Heartbeat:Connect(function()
+            if (LocalPlayer.Character:FindFirstChild('Confused')) then
+                LocalPlayer.Character:FindFirstChild('Confused'):Destroy();
+            end;
+        end;
+    end);
+end;
+
+function functions.antiHeal(toggle)
+    if(not toggle) then
+         maid.antiHeal = nil;
+        return;
+    end;
+
+    maid.antiHeal = RunService.Heartbeat:Connect(function()
+            if (LocalPlayer.Character:FindFirstChild('NoAbsoluteHeal')) then
+                LocalPlayer.Character:FindFirstChild('NoAbsoluteHeal'):Destroy();
+            end;
+        end;
+    end);
+end;
+
+function functions.noFallDamage(toggle)
+    if(not toggle) then
+         maid.antiHeal = nil;
+        return;
+    end;
+
+    maid.antiHeal = RunService.Heartbeat:Connect(function()
+            if (ReplicatedStorage:FindFirstChild('FallDamage')) then
+                ReplicatedStorage:FindFirstChild('FallDamage'):Destroy();
+            end;
+        end;
+    end);
+end;
+
+function functions.noBlur(toggle)
+        if(not toggle) then
+         maid.noBlur = nil;
+        return;
+    end;
+
+    maid.noBlur = RunService.Heartbeat:Connect(function()
+            if (Lighting:FindFirstChild('rawr')) then
+                Lighting:FindFirstChild('rawr'):Destroy();
+            end;
+        end;
+    end);
+end;
+
 misccheats:AddButton({
     text = 'Server Hop',
     tip = 'Jumps to any other server, non region dependant',
@@ -614,21 +732,21 @@ misccheats:AddBox({
     text = 'First Name',
     tip = 'Change the first name of your character [client]',
     callback = function(value)
-        game:GetService("Players").LocalPlayer.leaderstats.FirstName.Value = value
+        LocalPlayer.leaderstats.FirstName.Value = value
     end;
 });
 misccheats:AddBox({
     text = 'Last Name',
     tip = 'Change the last name of your character [client]',
     callback = function(value)
-        game:GetService("Players").LocalPlayer.leaderstats.LastName.Value = value
+        LocalPlayer.leaderstats.LastName.Value = value
     end;
 });
 misccheats:AddBox({
     text = 'Title',
     tip = 'Change the title of your character [client]',
     callback = function(value)
-        game:GetService("Players").LocalPlayer.leaderstats.Title.Value = value
+        LocalPlayer.leaderstats.Title.Value = value
     end;
 });
 end;
@@ -684,14 +802,19 @@ do -- One Shot NPCs
         table.clear(mobs);
     end;
 
+    local valid = {
+        ['#HITBOX_SIMULATION'] = true;
+        ['HITBOX_SIMULATION'] = true;
+        ['_Dungeon'] = true;
+    };
+
     Utility.listenToChildAdded(workspace.Live, function(obj)
         task.wait(0.2);
-        if (obj == LocalPlayer.Character) then return; end
-        if obj.Name ~= "HITBOX_SIMULATION#" or obj.Name ~= "#HITBOX_SIMULATION" then
-            return
-        end	
+        if (obj == LocalPlayer.Character) then return; end;
+        if (not valid[obj.Name]) then return; end;
         NetworkOneShot.new(obj);
     end);
+
 
     function functions.networkOneShot(t)
         if (not t) then
@@ -725,192 +848,50 @@ combatcheats:AddToggle({
 
 playercheats:AddDivider("Player Settings");
 
-getrenv().NoStun =
-    playercheats:AddToggle({
-        text = 'No Stun',
-        callback = function(value)
-            if value then
-            getrenv().NoStun = true
-        else
-            getrenv().NoStun = false
+playercheats:AddToggle({
+    text = 'No Stun',
+    callback = functions.noStun
+});
 
-        end;
-        end;
-    });
-local player = game:GetService("Players");
-local localPlayer = player.LocalPlayer;
-local RunService = game:GetService("RunService")
+playercheats:AddToggle({
+    text = 'Blatant No Stun',
+    callback = functions.blatantNoStun
+});
 
-getrenv().NoStun = false
+playercheats:AddDivider('Removals');
 
-local connection
-connection = RunService.RenderStepped:Connect(function()
-    if (not getrenv().NoStun) then return end
-    if localPlayer.Character.Values.Running.Value == true then
-        localPlayer.Humanoid.WalkSpeed = 26
-    else
-        localPlayer.Character.Humanoid.WalkSpeed = 16
-    end;
-end);
+playercheats:AddToggle({
+    text = 'Anti Fire',
+    callback = functions.antiFire
+});
 
+playercheats:AddToggle({
+    text = 'Anti Void-Fire',
+    callback = functions.antiVoidFire
+});
 
-getrenv().BlatantNoStun =
-    playercheats:AddToggle({
-        text = 'Blatant No Stun',
-        callback = function(value)
-            if value then
-            getrenv().BlatantNoStun = true
-        else
-            getrenv().BlatantNoStun = false
+playercheats:AddToggle({
+    text = 'Anti Confused',
+    callback = functions.antiConfused
+});
 
-        end;
-        end;
-    });
-local player = game:GetService("Players");
-local localPlayer = player.LocalPlayer;
-local RunService = game:GetService("RunService")
-
-getrenv().BlatantNoStun = false
-
-local connection
-connection = RunService.RenderStepped:Connect(function()
-    if (not getrenv().BlatantNoStun) then return end
-    localPlayer.Character.Humanoid.WalkSpeed = 26
-end)
-
-playercheats:AddDivider("Removals");
-
-getrenv().NoFire =
-    playercheats:AddToggle({
-        text = 'Anti Fire',
-        callback = function(value)
-            if value then
-            getrenv().NoFire = true
-        else
-            getrenv().NoFire = false
-        end;
-        end;
-
-    });
-local player = game:GetService("Players");
-local localPlayer = player.LocalPlayer;
-local RunService = game:GetService("RunService")
-
-getrenv().NoFire = false
-
-local connection
-connect = RunService.RenderStepped:Connect(function()
-    if (not getrenv().NoFire ) then return end
-    if game:GetService("Players").LocalPlayer.Character.Values.OnFire.Value == true then
-        local args = {
-            [1] = Enum.KeyCode.S,
-            [2] = CFrame.new(1804.400390625, 7528.03076171875, -2765.593505859375) * CFrame.Angles(-2.143744468688965, -1.2413746118545532, -2.1692001819610596),
-            [3] = {}
-        }
-        game:GetService("ReplicatedStorage").Dash:FireServer(unpack(args))
-    end;
-end);
-getrenv().NoVoidFire = 
-    playercheats:AddToggle({
-        text = 'Anti Void-Fire',
-        callback = function(value)
-            if value then
-            getrenv().NoVoidFire = true
-        else
-            getrenv().NoVoidFire = false
-        end;
-        end;
-    });
-getrenv().NoVoidFire = false
-
-local connection
-connection = RunService.RenderStepped:Connect(function()
-    if (not getrenv().NoVoidFire) then return end
-    game:GetService("Players").LocalPlayer.Character:WaitForChild("VoidFire"):Destroy()
-end);
+playercheats:AddToggle({
+    text = 'Anti Heal',
+    tip = 'Absolute heal during dungeon.',
+    callback = functions.antiHeal
+});
 
 
-getrenv().AntiConfused = 
-    playercheats:AddToggle({
-        text = 'Anti Confused',
-        callback = function(value)
-            if value then
-            getrenv().AntiConfused = true
-        else
-            getrenv().AntiConfused = false
-        end;
-        end;
-    });
-getrenv().AntiConfused = false
-
-local connection
-connection = RunService.RenderStepped:Connect(function()
-    if (not getrenv().AntiConfused) then return end
-    game.Players.LocalPlayer.Character:WaitForChild("Confused"):Destroy()
-end);
-
-getrenv().Heal = 
-    playercheats:AddToggle({
-        text = 'Anti Heal',
-        tip = 'Absolute heal during dungeon.',
-        callback = function(value)
-            if value then
-            getrenv().Heal = true
-        else
-            getrenv().Heal = false
-        end;
-        end;
-    });
-getrenv().Heal = false
-
-local connection
-connection = RunService.RenderStepped:Connect(function()
-    if (not getrenv().Heal) then return end
-    game:GetService("Players").LocalPlayer.Character:WaitForChild("NoAbsoluteHeal"):Destroy()
-end);
-
-getrenv().NoFallDamage =
-    playercheats:AddToggle({
-        text = 'No Fall Damage',
-        callback = function(value)
-            if value then
-            getrenv().NoFallDamage = true
-        else 
-            getrenv().NoFallDamage = false
-        end;
-        end;
-    });
+playercheats:AddToggle({
+    text = 'No Fall Damage',
+    callback = noFallDamage
+});
 
 
-
-getrenv().NoFallDamage = false
-local connection
-connection = RunService.RenderStepped:Connect(function()
-    if (not getrenv().NoFallDamage) then return end
-    task.wait(1.5)
-    game:GetService("ReplicatedStorage"):WaitForChild("FallDamage"):Remove()
-end);
-
-
-getrenv().blur =
-    playercheats:AddToggle({
-        text = 'No Blur',
-        callback = function(value)
-            if value then
-            getrenv().blur = true
-        else 
-            getrenv().blur = false
-        end;
-        end;
-    });
-
-getrenv().blur = false
-local connection
-connection = RunService.RenderStepped:Connect(function()
-    if (not getrenv().blur) then return end
-    game:GetService("Lighting"):WaitForChild("rawr"):Destroy()
-end);
-
+playercheats:AddToggle({
+    text = 'No Blur',
+    callback = functions.noBlur
+});
 
 local VisualsMisc = column2:AddSection('Visuals');
 VisualsMisc:AddDivider("Game Visuals");
