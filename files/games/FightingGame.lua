@@ -802,7 +802,7 @@ do -- One Shot NPCs
     end;
 
     function NetworkOneShot:Update()
-        if (not self.hrp or not self.hrp.Parent or self.hrp.Parent.Parent ~= workspace.Live) then return end;
+        if (not self.hrp or not self.hrp.Parent or self.hrp.Parent.Parent ~= workspace) then return end;
 
         local hasOwnership = isnetworkowner(self.hrp);
 
@@ -856,12 +856,10 @@ do -- One Shot NPCs
 
     Utility.listenToChildAdded(workspace, function(obj)
         task.wait(0.2);
-        print(obj)
         if (obj == LocalPlayer.Character) then return; end;
         if (not valid[obj.Name]) then return; end;
         NetworkOneShot.new(obj);
     end);
-
 
     function functions.networkOneShot(t)
         if (not t) then
