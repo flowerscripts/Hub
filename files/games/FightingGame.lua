@@ -462,7 +462,7 @@ local function onNewAwardAdded(award, espConstructor)
                 return setmetatable({}, {
                     __index = function(_, p)
                         if (p == 'Position') then
-                            return award.PrimaryPart and award.PrimaryPart.Position or award.WorldPivot.Position
+                            return award and award.Position or award.WorldPivot.Position
                         end;
                     end,
                 });
