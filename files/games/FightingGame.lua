@@ -358,10 +358,6 @@ local function onNewMobAdded(mob, espConstructor)
                 table.insert(foundMobs,model)
 
                 CollectionService:AddTag(model, "Mob")
-                for i,v in pairs(CollectionService:GetTags(model)) do
-
-                    print(i,v)
-                end
             end
         end
     end
