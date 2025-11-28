@@ -852,6 +852,8 @@ do -- One Shot NPCs
         ['Poison Orb']    = true;
         ['Dark Eye']      = true;
         ['Flame Beast']   = true;
+        ['Worm']          = true;
+        ['Big Worm']      = true;
     };
 
     Utility.listenToChildAdded(workspace, function(obj)
