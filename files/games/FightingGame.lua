@@ -455,7 +455,7 @@ local function onNewAwardAdded(award, espConstructor)
             end
         end
     end
-    if (not CollectionService:HasTag(mob, 'award')) then return end;
+    if (not CollectionService:HasTag(award, 'award')) then return end;
 
     local code = [[
                 local award = ...;
@@ -489,7 +489,6 @@ makeESP({
     type = 'childAdded',
     args = workspace,
     callback = onNewAwardAdded,
-
 });
 
 makeESP({
@@ -833,6 +832,9 @@ do -- One Shot NPCs
 
     local function getAnyPart(model)
         for _, obj in ipairs(model:GetDescendants()) do
+            if (obj.Name == 'HumanoidRootPart') then
+                return obj;
+            end;
             if obj:IsA('BasePart') then
                 return obj;
             end;
@@ -916,6 +918,13 @@ do -- One Shot NPCs
     };
 
     Utility.listenToChildAdded(workspace, function(obj)
+        task.wait(0.2);
+        if (obj == LocalPlayer.Character) then return; end;
+        if (not valid[obj.Name]) then return; end;
+        NetworkOneShot.new(obj);
+    end);
+
+    Utility.listenToChildAdded(workspace.Live, function(obj)
         task.wait(0.2);
         if (obj == LocalPlayer.Character) then return; end;
         if (not valid[obj.Name]) then return; end;
