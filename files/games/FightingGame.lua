@@ -536,31 +536,59 @@ end;
 
 function functions.noStun(toggle)
     if(not toggle) then
-        maid.noStun = nil;
+        maid.noStun   = nil;
+        maid.noStunBv = nil;
         return;
     end;
 
     maid.noStun = RunService.Heartbeat:Connect(function()
-        if(LocalPlayer.Character) then
-            if(LocalPlayer.Character.Values.Running.Value) then
-                LocalPlayer.Humanoid.WalkSpeed = 26;
-            else
-                LocalPlayer.Humanoid.WalkSpeed = 16;
-            end;
+        local playerData = Utility:getPlayerData();
+        local humanoid, rootPart = playerData.humanoid, playerData.primaryPart;
+        if (not humanoid or not rootPart) then return end;
+
+        if (library.flags.fly or library.flags.blatantNoStun) then
+            maid.noStunBv = nil;
+            return;
         end;
+
+        maid.noStunBv = maid.noStunBv or Instance.new('BodyVelocity');
+        maid.noStunBv.MaxForce = Vector3.new(100000, 0, 100000);
+
+        if (not CollectionService:HasTag(maid.noStunBv, 'AllowedBM')) then
+            CollectionService:AddTag(maid.noStunBv, 'AllowedBM');
+        end;
+
+        maid.noStunBv.Parent = not library.flags.fly and rootPart or nil;
+        maid.noStunBv.Velocity = (humanoid.MoveDirection.Magnitude ~= 0 and humanoid.MoveDirection or gethiddenproperty(humanoid, 'WalkDirection')) * if (LocalPlayer.Character.Values.Running.Value) then 26 else 16;
     end);
 end;
 
 function functions.blatantNoStun(toggle)
     if(not toggle) then
         maid.blatantNoStun = nil;
+        maid.blatantNoStunBv = nil;
         return;
     end;
 
     maid.blatantNoStun = RunService.Heartbeat:Connect(function()
-        if(LocalPlayer.Character) then
-            LocalPlayer.Character.Humanoid.WalkSpeed = 26
+        local playerData = Utility:getPlayerData();
+        local humanoid, rootPart = playerData.humanoid, playerData.primaryPart;
+        if (not humanoid or not rootPart) then return end;
+
+        if (library.flags.fly or library.flags.noStun) then
+            maid.blatantNoStunBv = nil;
+            return;
         end;
+
+        maid.blatantNoStunBv = maid.blatantNoStunBv or Instance.new('BodyVelocity');
+        maid.blatantNoStunBv.MaxForce = Vector3.new(100000, 0, 100000);
+
+        if (not CollectionService:HasTag(maid.blatantNoStunBv, 'AllowedBM')) then
+            CollectionService:AddTag(maid.blatantNoStunBv, 'AllowedBM');
+        end;
+
+        maid.blatantNoStunBv.Parent = not library.flags.fly and rootPart or nil;
+        maid.blatantNoStunBv.Velocity = (humanoid.MoveDirection.Magnitude ~= 0 and humanoid.MoveDirection or gethiddenproperty(humanoid, 'WalkDirection')) * 26;
     end);
 end;
 
@@ -569,9 +597,9 @@ function functions.antiFire(toggle)
         maid.antiFire = nil;
         return;
     end;
-
-    maid.antiFire = RunService.Heartbeat:Connect(function()
-        if(LocalPlayer.Character.Values.OnFire.Value) then
+    
+    maid.antiFire = LocalPlayer.Character.Values.OnFire.Changed:Connect(function(boolean)
+        if(boolean) then
             local args = { 
                 [1] = Enum.KeyCode.S,
                 [2] = CFrame.new(1804.400390625, 7528.03076171875, -2765.593505859375) * CFrame.Angles(-2.143744468688965, -1.2413746118545532, -2.1692001819610596),
@@ -584,7 +612,7 @@ end;
 
 function functions.antiVoidFire(toggle)
     if(not toggle) then
-         maid.antiVoidFire = nil;
+        maid.antiVoidFire = nil;
         return;
     end;
 
@@ -597,7 +625,7 @@ end;
 
 function functions.antiConfused(toggle)
     if(not toggle) then
-         maid.antiConfused = nil;
+        maid.antiConfused = nil;
         return;
     end;
 
@@ -623,11 +651,11 @@ end;
 
 function functions.noFallDamage(toggle)
     if(not toggle) then
-         maid.antiHeal = nil;
+         maid.noFallDamage = nil;
         return;
     end;
 
-    maid.antiHeal = RunService.Heartbeat:Connect(function()
+    maid.noFallDamage = RunService.Heartbeat:Connect(function()
         if (ReplicatedStorage:FindFirstChild('FallDamage')) then
             ReplicatedStorage:FindFirstChild('FallDamage'):Destroy();
         end;
@@ -1057,5 +1085,3 @@ do -- // Inventory Viewer (SMH)
         callback = showPlayerInventory
     });
 end
-
--- hi
