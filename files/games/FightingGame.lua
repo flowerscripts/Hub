@@ -468,7 +468,7 @@ local function onNewAwardAdded(award, espConstructor)
                 });
             ]]
 
-    local formattedName = formatMobName(award:WaitForChild('BillboardGui').TextLabel);
+    local formattedName = formatMobName(award:WaitForChild('BillboardGui').TextLabel.Text);
     local awardEsp = espConstructor.new({code = code, vars = {award}}, formattedName);
 
     if (formattedName == 'Blessing') then
