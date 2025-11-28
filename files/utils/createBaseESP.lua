@@ -144,7 +144,8 @@ local library = sharedRequire('UILibrary.lua');
 		BaseEsp.Container = container;
 		BaseEsp.__index = BaseEsp;
 
-		local whiteColor = Color3.new(1, 1, 1);
+		local whiteColor = container.color or Color3.new(1, 1, 1);
+		
 
 		local maxDistanceFlag = BaseEsp.Flag .. 'MaxDistance';
 		local showHealthFlag = BaseEsp.Flag .. 'ShowHealth';
