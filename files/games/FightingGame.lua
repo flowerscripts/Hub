@@ -204,8 +204,9 @@ do -- // Setup Leaderboard Spectate
         local newPlayerSpectatingLabel;
 
         for _, v in next, LocalPlayer.PlayerGui.Leaderboard.ScrollingFrame:GetChildren() do
-            if (v:IsA('Frame') and v:FindFirstChild('PlayerName') and v.PlayerName.TextTransparency ~= 1) then
+            if (v:IsA('Frame') and v:FindFirstChild('PlayerName')) then
                 newPlayerSpectating = v.PlayerName.Text;
+                print(newPlayerSpectating);
                 newPlayerSpectatingLabel = v.PlayerName;
                 playerSpectatingLabel = newPlayerSpectatingLabel
                 break;
@@ -224,13 +225,11 @@ do -- // Setup Leaderboard Spectate
         if (newPlayerSpectating == playerSpectating or newPlayerSpectating == LocalPlayer.Name) then
             setCameraSubject(LocalPlayer.Character);
         else
-            print('spectating new player');
             playerSpectating = newPlayerSpectating;
 
             local player = Players:FindFirstChild(playerSpectating);
 
             if (not player or not player.Character or not player.Character.PrimaryPart) then
-                print('player not found', player);
                 setCameraSubject(LocalPlayer.Character);
                 return;
             end;
