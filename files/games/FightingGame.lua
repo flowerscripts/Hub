@@ -863,7 +863,7 @@ do -- One Shot NPCs
     end;
 
     function NetworkOneShot:Update()
-        if (not self.hrp or not self.hrp.Parent or self.hrp.Parent.Parent ~= workspace) then return end;
+        if (not self.hrp or not self.hrp.Parent) then return end;
 
         local hasOwnership = isnetworkowner(self.hrp);
 
