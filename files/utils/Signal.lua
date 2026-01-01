@@ -1,4 +1,3 @@
-SX_VM_CNONE();
 --- Lua-side duplication of the API of events on Roblox objects.
 -- Signals are needed for to ensure that for local events objects are passed by
 -- reference rather than by value where possible, as the BindableEvent objects
@@ -32,11 +31,18 @@ end;
 -- @param ... Variable arguments to pass to handler
 -- @treturn nil
 function Signal:Fire(...)
+	if not self._bindableEvent then return end
+	
 	self._argData = {...}
 	self._argCount = select("#", ...)
 	self._bindableEvent:Fire()
-	self._argData = nil
-	self._argCount = nil
+	
+	-- Don't clear immediately - let the event propagate first
+	-- Use task.defer to clear after current frame
+	task.defer(function()
+		self._argData = nil
+		self._argCount = nil
+	end)
 end
 
 --- Connect a new handler to the event. Returns a connection object that can be disconnected.
