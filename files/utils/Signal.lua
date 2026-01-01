@@ -43,15 +43,14 @@
 	-- @treturn Connection Connection object that can be disconnected
 	function Signal:Connect(handler)
 		if not self._bindableEvent then return error("Signal has been destroyed"); end --Fixes an error while respawning with the UI injected
+		if not self._argData then return error("A error within Signal has occured"); end;
 
 		if not (type(handler) == "function") then
 			error(("connect(%s)"):format(typeof(handler)), 2)
 		end
 
 		return self._bindableEvent.Event:Connect(function()
-			if (self._argData and self._argCount) then
-				handler(unpack(self._argData, 1, self._argCount))
-			end;
+			handler(unpack(self._argData, 1, self._argCount))
 		end)
 	end
 
