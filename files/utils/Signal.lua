@@ -33,30 +33,24 @@ end;
 function Signal:Fire(...)
 	if not self._bindableEvent then return end
 	
-	self._argData = {...}
-	self._argCount = select("#", ...)
-	self._bindableEvent:Fire()
+	local args = {...}
+	local argCount = select("#", ...)
 	
-	-- Don't clear immediately - let the event propagate first
-	-- Use task.defer to clear after current frame
-	task.defer(function()
-		self._argData = nil
-		self._argCount = nil
-	end)
+	-- Pass a unique reference for this specific fire
+	self._bindableEvent:Fire(args, argCount)
 end
 
---- Connect a new handler to the event. Returns a connection object that can be disconnected.
--- @tparam function handler Function handler called with arguments passed when `:Fire(...)` is called
--- @treturn Connection Connection object that can be disconnected
 function Signal:Connect(handler)
-	if not self._bindableEvent then return error("Signal has been destroyed"); end --Fixes an error while respawning with the UI injected
+	if not self._bindableEvent then 
+		return error("Signal has been destroyed")
+	end
 
-	if not (type(handler) == "function") then
+	if type(handler) ~= "function" then
 		error(("connect(%s)"):format(typeof(handler)), 2)
 	end
 
-	return self._bindableEvent.Event:Connect(function()
-		handler(unpack(self._argData, 1, self._argCount))
+	return self._bindableEvent.Event:Connect(function(args, argCount)
+		handler(unpack(args, 1, argCount))
 	end)
 end
 
