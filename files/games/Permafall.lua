@@ -1,16 +1,16 @@
 local library = sharedRequire('UILibrary.lua');
 
 local AudioPlayer = sharedRequire('utils/AudioPlayer.lua');
-local makeESP = sharedRequire('utils/makeESP.lua');
+--local makeESP = sharedRequire('utils/makeESP.lua');
 
 local Utility = sharedRequire('utils/Utility.lua');
 local Maid = sharedRequire('utils/Maid.lua');
 local AnalyticsAPI = sharedRequire('classes/AnalyticsAPI.lua');
 
 local Services = sharedRequire('utils/Services.lua');
-local createBaseESP = sharedRequire('utils/createBaseESP.lua');
+--local createBaseESP = sharedRequire('utils/createBaseESP.lua');
 
-local EntityESP = sharedRequire('classes/EntityESP.lua');
+--local EntityESP = sharedRequire('classes/EntityESP.lua');
 local ControlModule = sharedRequire('classes/ControlModule.lua');
 local ToastNotif = sharedRequire('classes/ToastNotif.lua');
 
@@ -43,7 +43,6 @@ local Players, RunService, UserInputService, HttpService, CollectionService = Se
 local LocalPlayer = Players.LocalPlayer;
 
 local maid = Maid.new();
-local entityEspList = {};
 
 
 local localcheats = column1:AddSection('Local Cheats');
@@ -126,9 +125,11 @@ do -- // Functions
             maid.antiFire = nil;
             return;
         end;
-        
+        print('hello')
         maid.antiFire = LocalPlayer.Character.Values.OnFire.Changed:Connect(function(boolean)
+            print('bro')
             if(boolean) then
+                print('mimic')
                 local args = {
                     {
                         Enabled = true,
@@ -178,90 +179,8 @@ localcheats:AddSlider({
     value = 0, 
     textpos = 2});
 
-
-
-
-
-do -- // Setup Leaderboard Spectate
-    local lastUpdateAt = 0;
-
-    function setCameraSubject(subject)
-        if (subject == LocalPlayer.Character) then
-            playerSpectating = nil;
-            CollectionService:RemoveTag(LocalPlayer, 'ForcedSubject');
-
-            if (playerSpectatingLabel) then
-                playerSpectatingLabel.TextColor3 = Color3.fromRGB(255, 255, 255);
-                playerSpectatingLabel = nil;
-            end;
-
-            maid.spectateUpdate = nil;
-            return;
-        end;
-
-        CollectionService:AddTag(LocalPlayer, 'ForcedSubject');
-        workspace.CurrentCamera.CameraSubject = subject;
-
-        maid.spectateUpdate = task.spawn(function()
-            while task.wait() do
-                if (tick() - lastUpdateAt < 5) then continue end;
-                lastUpdateAt = tick();
-                task.spawn(function()
-                    LocalPlayer:RequestStreamAroundAsync(workspace.CurrentCamera.CFrame.Position);
-                end);
-            end;
-        end);
-    end;
-
-    UserInputService.InputBegan:Connect(function(inputObject)
-        if (inputObject.UserInputType ~= Enum.UserInputType.MouseButton1 or not LocalPlayer:FindFirstChild('PlayerGui') or not LocalPlayer.PlayerGui:FindFirstChild('LeaderboardGui')) then return end;
-
-        local newPlayerSpectating;
-        local newPlayerSpectatingLabel;
-
-        for _, v in next, LocalPlayer.PlayerGui.Leaderboard.ScrollingFrame:GetChildren() do
-            if (v:IsA('Frame') and v:FindFirstChild('PlayerName')) then
-                local filteredName = string.gsub(v.PlayerName.Text, ' ', '');
-                newPlayerSpectating = filteredName;
-                newPlayerSpectatingLabel = v.PlayerName;
-                break;
-            end;
-        end;
-
-        if (not newPlayerSpectating) then return end;
-
-        if (playerSpectatingLabel) then
-            playerSpectatingLabel.TextColor3 = Color3.fromRGB(255, 255, 255);
-        end;
-
-        playerSpectatingLabel = newPlayerSpectatingLabel;
-        playerSpectatingLabel.TextColor3 = Color3.fromRGB(255, 0, 0);
-
-        if (newPlayerSpectating == playerSpectating or newPlayerSpectating == LocalPlayer.Name) then
-            setCameraSubject(LocalPlayer.Character);
-        else
-            print('spectating new player');
-            playerSpectating = newPlayerSpectating;
-
-            local player = Players:FindFirstChild(playerSpectating);
-
-            if (not player or not player.Character or not player.Character.PrimaryPart) then
-                print('player not found', player);
-                setCameraSubject(LocalPlayer.Character);
-                return;
-            end;
-
-            setCameraSubject(player.Character);
-        end;
-    end);
-
-    TextLogger.setCameraSubject = setCameraSubject;
-end;
-
-
 function functions.Respawn(resp)
     if(resp or library:ShowConfirm('Are you sure you want to respawn?')) then
-
         game.Players.LocalPlayer.Character.Humanoid.Health = 0
     end
 end
@@ -288,19 +207,6 @@ local VisualsMisc = column2:AddSection('Visuals');
 VisualsMisc:AddDivider("Game Visuals");
 local Lighting = game:GetService("Lighting")
 
-local lastFogDensity = 0;
-
-function functions.noFog(t)
-    if not t then Lighting.Atmosphere.Density = lastFogDensity; maid.noFog = nil; return; end
-
-    maid.noFog = Lighting.Atmosphere:GetPropertyChangedSignal('Density'):Connect(function()
-        Lighting.Atmosphere.Density = 0;
-    end);
-
-    lastFogDensity = Lighting.Atmosphere.Density;
-    Lighting.Atmosphere.Density = 0;
-end
-
 local oldAmbient, oldBritghtness = Lighting.Ambient, Lighting.Brightness;
 
 function functions.fullBright(toggle)
@@ -313,7 +219,7 @@ function functions.fullBright(toggle)
     oldAmbient, oldBritghtness = Lighting.Ambient, Lighting.Brightness;
     maid.fullBright = Lighting:GetPropertyChangedSignal('Ambient'):Connect(function()
         Lighting.Ambient = Color3.fromRGB(255, 255, 255);
-        Lighting.Brightness = 1;
+        Lighting.Brightness = library.flags.fullBrightValue;
     end);
     Lighting.Ambient = Color3.fromRGB(255, 255, 255);
 end;
