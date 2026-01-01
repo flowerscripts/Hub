@@ -75,8 +75,8 @@ do -- // Functions
             maid.speedHackBv = maid.speedHackBv or Instance.new('BodyVelocity');
             maid.speedHackBv.MaxForce = Vector3.new(100000, 0, 100000);
 
-            if (not CollectionService:HasTag(maid.speedHackBv, 'AllowedBM')) then
-                CollectionService:AddTag(maid.speedHackBv, 'AllowedBM');
+            if (not CollectionService:HasTag(maid.speedHackBv, 'good')) then
+                CollectionService:AddTag(maid.speedHackBv, 'good');
             end;
 
             maid.speedHackBv.Parent = not library.flags.fly and rootPart or nil;
@@ -101,8 +101,8 @@ do -- // Functions
             local rootPart, camera = playerData.rootPart, workspace.CurrentCamera;
             if (not rootPart or not camera) then return end;
 
-            if (not CollectionService:HasTag(maid.flyBv, 'AllowedBM')) then
-                CollectionService:AddTag(maid.flyBv, 'AllowedBM');
+            if (not CollectionService:HasTag(maid.flyBv, 'good')) then
+                CollectionService:AddTag(maid.flyBv, 'good');
             end;
 
             maid.flyBv.Parent = rootPart;
