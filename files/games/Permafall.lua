@@ -20,7 +20,6 @@ local TextLogger = sharedRequire('classes/TextLogger.lua');
 local fromHex = sharedRequire('utils/fromHex.lua');
 local toCamelCase = sharedRequire('utils/toCamelCase.lua');
 local Webhook = sharedRequire('utils/Webhook.lua');
-local Signal = sharedRequire('utils/Signal.lua');
 
 if (game.PlaceId == 126222071643660) then
     ToastNotif.new({
