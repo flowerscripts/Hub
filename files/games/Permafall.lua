@@ -833,8 +833,40 @@ do -- // Performance Functions
     end;
 end;
 
+local NPCs = workspace.NPCs;
+local Armors = {};
+
+do -- // Fetch All Armors
+    for _, child in NPCs:GetChildren() do
+        if (child.Name == 'Purchasable' and child:FindFirstChild('Clothing')) then
+            local PurchaseInfo = child.PurchaseInfo;
+            local ArmorName = PurchaseInfo.ItemName;
+            local RequiresClass = PurchaseInfo.RequiredClass
+
+            Armors[ArmorName.Value] = true;
+        end;
+    end;
+end;
+
 do -- // Misc
-	misc:AddDivider('Buy Armor');
+	misc:AddDivider('Buyables');
+
+    misc:AddList({
+        text = 'Select Armor',
+        tip = 'Select the Armor you wish to buy.',
+        values = Armors;
+        multiselect = false,
+        callback = function(value)
+            print(value);
+        end,
+    });
+
+    print(HttpService:JSONEncode(Armors));
+
+    misc:AddButton({
+		text = 'Buy Armor',
+		tip = 'Buys the Armor you selected.',
+	});
 
 	misc:AddDivider('Perfomance Improvements');
 
