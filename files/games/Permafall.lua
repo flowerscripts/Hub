@@ -34,6 +34,7 @@ if (game.PlaceId == 126222071643660) then
 end;
 
 
+
 local column1, column2 = unpack(library.columns);
 
 local functions = {};
@@ -66,6 +67,29 @@ local misc = column2:AddSection('Misc');
 local visuals = column2:AddSection('Visuals');
 local farms = column2:AddSection('Farms');
 local inventoryViewer = column2:AddSection('Inventory Viewer');
+
+local BodyMoverTag = 'good';
+local IsAntiCheatAlright = false;
+
+do -- // Anti Cheat Update Check
+    maid.antiCheatChecker = LocalPlayer.Character.HumanoidRootPart.ChildAdded:Connect(function(child)
+        if(child:IsA('BodyMover')) then
+            if(child:HasTag('good')) then
+                return LocalPlayer:Kick([[
+                    
+                    Error Code #54:
+                    The Anti-Cheat has been modified! The script will be disabled until I update it.
+                ]])
+            else
+                IsAntiCheatAlright = true;
+            end;
+        end;
+    end);
+
+    LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{ Enabled = true,  Character = LocalPlayer.Character,  InputType = "Dash"  }}))
+end;
+
+repeat task.wait() until IsAntiCheatAlright;
 
 do -- // Inventory Viewer (SMH)
     local inventoryLabels = {};
@@ -835,29 +859,44 @@ end;
 
 
 local NPCs = workspace.NPCs;
-local Armors = {};
-local ArmorSelected;
 
-do -- // Load All Armors
+local Armors, Weapons = {};
+local ArmorSelected, WeaponSelected;
+
+
+do -- // Load All Buyables
+
+    -- // Armor
     for _, child in NPCs:GetChildren() do
         if (child.Name == 'Purchasable' and child:FindFirstChild('Clothing')) then
             local PurchaseInfo = child.PurchaseInfo;
-            local ArmorName = PurchaseInfo.ItemName;
-            local RequiresClass = PurchaseInfo.RequiredClass
+            local ItemName = PurchaseInfo.ItemName;
 
-            Armors[ArmorName.Value] = true;
+            Armors[ItemName.Value] = true;
         end;
     end;
+
+    -- // Weapons
+
+      for _, child in NPCs:GetChildren() do
+        if (child.Name == 'Purchasable' and not child:FindFirstChild('Clothing')) then
+            local PurchaseInfo = child.PurchaseInfo;
+            local ItemName = PurchaseInfo.ItemName;
+
+            Weapons[ItemName.Value] = true;
+        end;
+    end;
+
 end;
 
 do -- // Opens the dialogue for the selected Armor.
-    function functions.initiateArmorDialogue(name)
+    function functions.buyItem(name)
         for _, child in NPCs:GetChildren() do
-            if (child.Name == 'Purchasable' and child:FindFirstChild('Clothing')) then
+            if (child.Name == 'Purchasable') then
                 local PurchaseInfo = child.PurchaseInfo;
-                local ArmorName = PurchaseInfo.ItemName;
+                local ItemName = PurchaseInfo.ItemName;
 
-                if (ArmorName.Value == name) then
+                if (ItemName.Value == name) then
                     fireclickdetector(child.ClickDetector);
                 end;
             end;
@@ -883,7 +922,26 @@ do -- // Misc
 		text = 'Buy Armor',
 		tip = 'Buys the Armor you selected.',
         callback = function()
-            functions.initiateArmorDialogue(ArmorSelected);
+            functions.buyItem(ArmorSelected);
+        end,
+	});
+
+    misc:AddList({
+        text = 'Select Weapon',
+        tip = 'Select the Weapon you wish to buy.',
+        values = Weapons;
+        multiselect = false,
+        callback = function(name)
+            WeaponSelected = name;
+        end,
+    });
+
+
+    misc:AddButton({
+		text = 'Buy Weapon',
+		tip = 'Buys the Weapon you selected.',
+        callback = function()
+            functions.buyItem(WeaponSelected);
         end,
 	});
 
