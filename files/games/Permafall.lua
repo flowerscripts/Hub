@@ -155,62 +155,61 @@ do -- // Functions
 	end;
 
     library.OnKeyPress:Connect(function(input, gpe)
-			SX_VM_CNONE();
+        SX_VM_CNONE();
 
-			if (gpe) then return end;
+        if (gpe) then return end;
 
-			local key = library.options.attachToBack.key;
-			if (input.KeyCode.Name == key or input.UserInputType.Name == key) then
-				local myRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('HumanoidRootPart');
-				local closest, closestDistance = nil, math.huge;
+        local key = library.options.attachToBack.key;
+        if (input.KeyCode.Name == key or input.UserInputType.Name == key) then
+            local myRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('HumanoidRootPart');
+            local closest, closestDistance = nil, math.huge;
 
-				if (not myRootPart) then return end;
+            if (not myRootPart) then return end;
 
-				repeat
-					for _, entity in next, workspace.Live:GetChildren() do
-						local rootPart = entity:FindFirstChild('HumanoidRootPart');
-						if (not rootPart or rootPart == myRootPart) then continue end;
+            repeat
+                for _, entity in next, workspace.Live:GetChildren() do
+                    local rootPart = entity:FindFirstChild('HumanoidRootPart');
+                    if (not rootPart or rootPart == myRootPart) then continue end;
 
-						local distance = (rootPart.Position - myRootPart.Position).magnitude;
+                    local distance = (rootPart.Position - myRootPart.Position).magnitude;
 
-						if (distance < 300 and distance < closestDistance) then
-							closest, closestDistance = rootPart, distance;
-						end;
-					end;
+                    if (distance < 300 and distance < closestDistance) then
+                        closest, closestDistance = rootPart, distance;
+                    end;
+                end;
 
-					task.wait();
-				until closest or input.UserInputState == Enum.UserInputState.End;
-				if (input.UserInputState == Enum.UserInputState.End) then return end;
+                task.wait();
+            until closest or input.UserInputState == Enum.UserInputState.End;
+            if (input.UserInputState == Enum.UserInputState.End) then return end;
 
-				maid.attachToBack = RunService.Heartbeat:Connect(function()
-					local goalCF = closest.CFrame * CFrame.new(0, library.flags.attachToBackHeight, library.flags.attachToBackSpace);
+            maid.attachToBack = RunService.Heartbeat:Connect(function()
+                local goalCF = closest.CFrame * CFrame.new(0, library.flags.attachToBackHeight, library.flags.attachToBackSpace);
 
-					local distance = (goalCF.Position - myRootPart.Position).Magnitude;
-					local tweenInfo = TweenInfo.new(distance / 100, Enum.EasingStyle.Linear);
+                local distance = (goalCF.Position - myRootPart.Position).Magnitude;
+                local tweenInfo = TweenInfo.new(distance / 100, Enum.EasingStyle.Linear);
 
-					local tween = TweenService:Create(myRootPart, tweenInfo, {
-						CFrame = goalCF
-					});
+                local tween = TweenService:Create(myRootPart, tweenInfo, {
+                    CFrame = goalCF
+                });
 
-					tween:Play();
+                tween:Play();
 
-					maid.attachToBackTween = function()
-						tween:Cancel();
-					end;
-				end);
-			end;
-		end);
+                maid.attachToBackTween = function()
+                    tween:Cancel();
+                end;
+            end);
+        end;
+	end);
 
-		library.OnKeyRelease:Connect(function(input)
-			SX_VM_CNONE();
+    library.OnKeyRelease:Connect(function(input)
+        SX_VM_CNONE();
 
-			local key = library.options.attachToBack.key;
-			if (input.KeyCode.Name == key or input.UserInputType.Name == key) then
-				maid.attachToBack = nil;
-				maid.attachToBackTween = nil;
-			end;
-		end);
-	end;
+        local key = library.options.attachToBack.key;
+        if (input.KeyCode.Name == key or input.UserInputType.Name == key) then
+            maid.attachToBack = nil;
+            maid.attachToBackTween = nil;
+        end;
+    end);
 end;
 
 -- NoClip
