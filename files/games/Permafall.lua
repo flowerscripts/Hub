@@ -69,7 +69,6 @@ local farms = column2:AddSection('Farms');
 local inventoryViewer = column2:AddSection('Inventory Viewer');
 
 local BodyMoverTag = 'good';
-local IsAntiCheatAlright = false;
 
 do -- // Anti Cheat Update Check
     maid.antiCheatChecker = LocalPlayer.Character.HumanoidRootPart.ChildAdded:Connect(function(child)
@@ -80,16 +79,12 @@ do -- // Anti Cheat Update Check
                 Error Code #54:
                 The Anti-Cheat has been modified! The script will be disabled until I update it.
                 ]])
-            elseif (child:HasTag('good')) then
-                IsAntiCheatAlright = true;
             end;
         end;
     end);
 
-    LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{ Enabled = true,  Character = LocalPlayer.Character,  InputType = "Dash"  }}))
+    LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{ Enabled = true,  Character = LocalPlayer.Character,  InputType = "Dash"  }}));
 end;
-
-repeat task.wait() until IsAntiCheatAlright;
 
 
 do -- // Inventory Viewer (SMH)
