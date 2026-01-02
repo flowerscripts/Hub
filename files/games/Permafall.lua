@@ -153,7 +153,7 @@ do -- // Functions
 		myRootPart.CFrame *= CFrame.new(0, -(myRootPart.Position.Y - floor.Position.Y) + 3, 0);
 		myRootPart.Velocity *= Vector3.new(1, 0, 1);
 	end;
-
+print('attach to back')
     library.OnKeyPress:Connect(function(input, gpe)
         if (gpe) then return end;
 
@@ -208,7 +208,7 @@ do -- // Functions
         end;
     end);
 end;
-
+print('noclip')
 -- NoClip
 	do
 		function functions.noClip(toggle)
@@ -307,7 +307,7 @@ end;
         end);
     end;
 
-
+print('autp sorint')
 
 do -- // Auto Sprint
     function functions.autoSprint(toggle)
@@ -333,6 +333,8 @@ end;
 
 
 local myChatLogs = {};
+
+print('oh its this')
 
 local chatLogger = TextLogger.new({
 	title = 'Chat Logger',
