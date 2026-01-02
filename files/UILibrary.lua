@@ -1247,13 +1247,13 @@ do -- // Load
 
 			if (option.playerOnly and option.multiselect) then
 				for i, v in next, option.values do
-					if (option.value[i]) then
+					if (i and option.value[i]) then
 						table.insert(t, tostring(i));
 					end;
 				end;
 			else
 				for i, v in next, option.values do
-					if (option.value[v]) then
+					if (v and option.value[v]) then
 						table.insert(t, tostring(v));
 					end;
 				end;
@@ -1434,7 +1434,7 @@ do -- // Load
 				option.listvalue:CaptureFocus();
 				option.listvalue.CursorPosition = string.len(typeof(option.value) == 'string' and option.value or getMultiText() or option.value) + 2;
 
-				if (option.multiselect) then
+				if (option and option.multiselect) then
 					option.listvalue.Text = ' ';
 				end;
 			end
