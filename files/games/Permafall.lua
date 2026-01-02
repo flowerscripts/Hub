@@ -256,18 +256,7 @@ do -- // Functions
 		if (not myRootPart or not myRootPart.Parent) then return end;
 
 		local floor = workspace:Raycast(myRootPart.Position, Vector3.new(0, -1000, 0), params);
-		if(not floor or not floor.Instance) then return end;
-
-		local isKillBrick = false;
-
-		for _, v in next, killBricks do
-			if (floor.Instance == v.part) then
-				isKillBrick = true;
-				break;
-			end;
-		end;
-
-		if (isKillBrick) then return end;
+		if(not floor or not floor.Instance) then return end;	
 
 		myRootPart.CFrame *= CFrame.new(0, -(myRootPart.Position.Y - floor.Position.Y) + 3, 0);
 		myRootPart.Velocity *= Vector3.new(1, 0, 1);
@@ -719,7 +708,7 @@ do -- // Local Cheats
 		text = 'Attach To Back Height',
 		value = 0,
 		min = -100,
-		max = 100,
+		max = 100,  
 		textpos = 2
 	});
 
