@@ -447,7 +447,7 @@ do -- // Auto Sprint
         local lastRan = 0;
 
         maid.autoSprint = UserInputService.InputBegan:Connect(function(input, gpe)
-            if (gpe or tick() - lastRan < 0.35) then return end;
+            if (gpe or tick() - lastRan < 0.1) then return end;
 
             if (table.find(moveKeys, input.KeyCode)) then
                 lastRan = tick();
