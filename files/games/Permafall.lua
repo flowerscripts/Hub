@@ -767,55 +767,40 @@ do -- // Misc
 end;
 
 do -- // Visual Functions
-    function functions.fullBright(toggle)
+    local oldAmbient, oldBrightness = Lighting.Ambient, Lighting.Brightness;
+
+    function functions.fullBright(toggle, brightness)
         if (not toggle) then
-            if maid.fullBright then
-                maid.fullBright:Disconnect();
-                maid.fullBright = nil;
-            end;
+            maid.fullBright = nil;
             Lighting.Ambient, Lighting.Brightness = oldAmbient, oldBrightness;
             return;
         end;
 
         oldAmbient, oldBrightness = Lighting.Ambient, Lighting.Brightness;
 
-        local function updateLighting()
+        maid.fullBright = Lighting:GetPropertyChangedSignal('Ambient'):Connect(function()
             Lighting.Ambient = Color3.fromRGB(255, 255, 255);
-            Lighting.Brightness = 0.1 * (library.flags['Full Bright Value'] or 1);
-        end;
+            Lighting.Brightness = brightness or 0.2;
+        end);
 
-        updateLighting();
-
-        maid.fullBright = Lighting:GetPropertyChangedSignal('Ambient'):Connect(updateLighting);
-
-        -- Optional: also update when slider changes
-        library.OnFlagChanged:Connect(function(data)
-            if data.flag == 'Full Bright Value' and library.flags['Full Bright'] then
-                Lighting.Brightness = 0.1 * library.flags['Full Bright Value'];
-            end
-        end)
+        Lighting.Ambient = Color3.fromRGB(255, 255, 255);
+        Lighting.Brightness = brightness or 0.2;
     end;
 end;
 
 do -- // Visuals
     visuals:AddToggle({
         text = 'Full Bright',
-        flag = 'Full Bright', 
-        callback = function(state)
-            functions.fullBright(state)
-        end
-    });
-
-    visuals:AddSlider({
+        callback = function(toggle)
+            local brightness = visuals:GetValue('Full Bright Value');
+            functions.fullBright(toggle, brightness);
+        end;
+    }):AddSlider({
         flag = 'Full Bright Value',
-        min = 1,
-        max = 10,
-        value = 1,
-        textpos = 2,
-        callback = function(val)
-            if library.flags['Full Bright'] then
-                Lighting.Brightness = 0.1 * val
-            end
-        end
+        min = 0.1,
+        max = 1,
+        value = 0.2,
+        step = 0.1; 
     });
 end;
+
