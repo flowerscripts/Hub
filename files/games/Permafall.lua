@@ -622,7 +622,8 @@ do -- // Local Cheats
     localCheats:AddSlider({
 		min = 16,
 		max = 200,
-		flag = 'Fly Hack Value'
+		flag = 'Fly Hack Value',
+        textpos = 2
 	});
 
 	localCheats:AddToggle({
@@ -632,7 +633,8 @@ do -- // Local Cheats
     localCheats:AddSlider({
 		min = 16,
 		max = 200,
-		flag = 'Speed Hack Value'
+		flag = 'Speed Hack Value',
+        textpos = 2
 	});
 
 	localCheats:AddToggle({
@@ -642,7 +644,8 @@ do -- // Local Cheats
     localCheats:AddSlider({
 		min = 50,
 		max = 250,
-		flag = 'Infinite Jump Height'
+		flag = 'Infinite Jump Height',
+        textpos = 2
 	});
 
 	localCheats:AddToggle({
@@ -785,11 +788,14 @@ end;
 
 do -- // Visuals
     visuals:AddToggle({
-        text = 'Full Bright'
-    }):AddSlider({
+        text = 'Full Bright',
+        callback = functions.fullBright
+    })
+    visuals:AddSlider({
         flag = 'Full Bright Value',
         min = 1,
         max = 10,
         value = 1,
+        textpos = 2
     });
 end;
