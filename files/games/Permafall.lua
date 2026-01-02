@@ -611,9 +611,10 @@ do -- // Removal Functions
             return;
         end;
 
-        local Humanoid = LocalPlayer.Character.Humanoid
+        local Humanoid = LocalPlayer.Character.Humanoid;
 
-        local FloorMaterial = Humanoid.FloorMaterial
+        local FloorMaterial = Humanoid.FloorMaterial;
+        local OldPosition   = LocalPlayer.Character.HumanoidRootPart.Position;
 
         maid.noFall = Humanoid:GetPropertyChangedSignal('FloorMaterial'):Connect(function()
             local oldFloorMaterial = FloorMaterial;
@@ -623,6 +624,14 @@ do -- // Removal Functions
 
             if (oldFloorMaterial == Enum.Material.Air) then
                 print('noFall?');
+
+                local args = {
+                    {
+                        InputType = "Crouching",
+                        Enabled = true
+                    }
+                }
+                game:GetService("Players").LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack(args))
             end;
         end);
     end;
