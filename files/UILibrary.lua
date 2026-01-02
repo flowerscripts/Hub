@@ -1253,7 +1253,7 @@ do -- // Load
 				end;
 			else
 				for i, v in next, option.values do
-					if (option and v and option.value[v]) then
+					if (option and v and option.value and option.value[v]) then
 						table.insert(t, tostring(v));
 					end;
 				end;
