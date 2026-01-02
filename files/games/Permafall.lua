@@ -1,18 +1,5 @@
 local library = sharedRequire('UILibrary.lua');
 
-local AudioPlayer = sharedRequire('utils/AudioPlayer.lua');
-
-local Utility = sharedRequire('utils/Utility.lua');
-local Maid = sharedRequire('utils/Maid.lua');
-local AnalyticsAPI = sharedRequire('classes/AnalyticsAPI.lua');
-
-local Services = sharedRequire('utils/Services.lua');
-local createBaseESP = sharedRequire('utils/createBaseESP.lua');
-
-local EntityESP = sharedRequire('classes/EntityESP.lua');
-local ControlModule = sharedRequire('classes/ControlModule.lua');
-
-
 local column1, column2 = unpack(library.columns);
 
 local functions = {};
