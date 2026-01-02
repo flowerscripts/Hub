@@ -393,8 +393,6 @@ do -- // Mod Logs and chat logger
         return rank >= MINIMUM_RANK;
     end;
 
-	end;
-
 	local function onPlayerAdded(player)
 		if (player == LocalPlayer) then return end;
 
