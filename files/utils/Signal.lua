@@ -30,36 +30,39 @@
 	-- Roblox signal conventions.
 	-- @param ... Variable arguments to pass to handler
 	-- @treturn nil
-	function Signal:Fire(...)
-		self._argData = {...}
-		self._argCount = select("#", ...)
-		self._bindableEvent:Fire()
-		self._argData = nil
-		self._argCount = nil
-	end
+function Signal:Fire(...)
+    local args = {...}
+    local count = select("#", ...)
+
+    -- Fire the BindableEvent with the captured args
+    self._bindableEvent:Fire(args, count)
+end
 
 	--- Connect a new handler to the event. Returns a connection object that can be disconnected.
 	-- @tparam function handler Function handler called with arguments passed when `:Fire(...)` is called
 	-- @treturn Connection Connection object that can be disconnected
-	function Signal:Connect(handler)
-		if not self._bindableEvent then return error("Signal has been destroyed"); end --Fixes an error while respawning with the UI injected
+function Signal:Connect(handler)
+    if not self._bindableEvent then 
+        return error("Signal has been destroyed"); 
+    end
 
-		if not (type(handler) == "function") then
-			error(("connect(%s)"):format(typeof(handler)), 2)
-		end
+    if type(handler) ~= "function" then 
+        error(("connect(%s)"):format(typeof(handler)), 2) 
+    end
 
-		return self._bindableEvent.Event:Connect(function()
-			handler(unpack(self._argData, 1, self._argCount))
-		end)
-	end
+    return self._bindableEvent.Event:Connect(function(args, count)
+        handler(unpack(args, 1, count))
+    end)
+end
+
 
 	--- Wait for fire to be called, and return the arguments it was given.
 	-- @treturn ... Variable arguments from connection
-	function Signal:Wait()
-		self._bindableEvent.Event:Wait()
-		assert(self._argData, "Missing arg data, likely due to :TweenSize/Position corrupting threadrefs.")
-		return unpack(self._argData, 1, self._argCount)
-	end
+function Signal:Wait()
+    local args, count = self._bindableEvent.Event:Wait()
+    return unpack(args, 1, count)
+end
+
 
 	--- Disconnects all connected events to the signal. Voids the signal as unusable.
 	-- @treturn nil
