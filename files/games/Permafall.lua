@@ -92,6 +92,10 @@ do -- // Anti Cheat Update Check
     end);
 
     LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{ Enabled = true,  Character = LocalPlayer.Character,  InputType = "Dash"  }}));
+
+    task.delay(0.5, function()
+        LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{ Enabled = true,  Character = LocalPlayer.Character,  InputType = "Dash"  }}));
+    end);
 end;
 
 repeat task.wait() until IsAntiCheatAlright;
