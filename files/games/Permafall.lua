@@ -74,11 +74,11 @@ local IsAntiCheatAlright = false;
 do -- // Anti Cheat Update Check
     maid.antiCheatChecker = LocalPlayer.Character.HumanoidRootPart.ChildAdded:Connect(function(child)
         if(child:IsA('BodyMover')) then
-            if(child:HasTag('good')) then
+            if(not child:HasTag('good')) then
                 return LocalPlayer:Kick([[
                     
-                    Error Code #54:
-                    The Anti-Cheat has been modified! The script will be disabled until I update it.
+                Error Code #54:
+                The Anti-Cheat has been modified! The script will be disabled until I update it.
                 ]])
             else
                 IsAntiCheatAlright = true;
