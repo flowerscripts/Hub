@@ -634,7 +634,9 @@ do -- // Removal Functions
             end;
 
             if (oldFloorMaterial == Enum.Material.Air) then
-                task.delay(0.25, function()
+                LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = true }}))
+                
+                task.delay(1, function()
                     maid.noFallCore = nil;
 
                     LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = false }}))
