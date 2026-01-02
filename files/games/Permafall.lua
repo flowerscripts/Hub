@@ -378,6 +378,16 @@ end;
             return;
         end;
 
+        if(LocalPlayer.Character:FindFirstChild('Knocked')) then
+            for _, newChild in LocalPlayer.Character:GetChildren() do
+                if(newChild.Name == 'Ragdolled' or newChild.Name == 'ActuallyRagdolled') then
+                    newChild:Destroy();
+                end;
+            end;
+
+            LocalPlayer.Character.Knocked:Destroy();
+        end;
+
         maid.knockedOwnership = LocalPlayer.Character.ChildAdded:Connect(function(child)
             if(child.Name == 'Knocked') then
                 for _, newChild in LocalPlayer.Character:GetChildren() do
@@ -471,14 +481,11 @@ do -- // Auto Sprint
         local lastRan = 0;
 
         maid.autoSprint = UserInputService.InputBegan:Connect(function(input, gpe)
-            if (gpe or tick() - lastRan < 0.6) then return end;
+            if (gpe or tick() - lastRan < 0.35) then return end;
 
             if (table.find(moveKeys, input.KeyCode)) then
                 lastRan = tick();
 
-                print('auto sprint bro')
-
-                VirtualInputManager:SendKeyEvent(true, input.KeyCode, false, game);
                 VirtualInputManager:SendKeyEvent(true, input.KeyCode, false, game);
                 VirtualInputManager:SendKeyEvent(true, input.KeyCode, false, game);
 
@@ -804,6 +811,8 @@ do -- // Performance Functions
 end;
 
 do -- // Misc
+	misc:AddDivider('Buy Armor');
+
 	misc:AddDivider('Perfomance Improvements');
 
 	misc:AddToggle({
