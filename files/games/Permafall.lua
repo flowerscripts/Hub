@@ -605,8 +605,43 @@ local function tweenTeleport(rootPart, position, noWait)
 end;
 
 do -- // Removal Functions
-    function functions.noFall(toggle)
+   function functions.noFall(toggle)
+        if (not toggle) then
+            maid.noFall = nil;
+            return;
+        end;
 
+        maid.noFall = RunService.Heartbeat:Connect(function()
+            local Character = LocalPlayer.Character;
+            if (not Character) then return; end;
+
+            local Humanoid = Character:FindFirstChildOfClass('Humanoid');
+            local Root = Character:FindFirstChild('HumanoidRootPart');
+            local Communicate = Character:FindFirstChild('Communicate');
+
+            if (not Humanoid or not Root or not Communicate) then return; end;
+            if (Humanoid.FloorMaterial ~= Enum.Material.Air) then return; end;
+            if (Root.Velocity.Y >= 0) then return; end;
+
+            local Params = RaycastParams.new();
+            Params.FilterType = Enum.RaycastFilterType.Blacklist;
+            Params.FilterDescendantsInstances = {Character};
+
+            local Result = workspace:Raycast(
+                Root.Position,
+                Vector3.new(0, -30, 0),
+                Params
+            );
+
+            if (Result and Result.Distance <= 18) then
+                Communicate:FireServer(unpack({
+                    {
+                        InputType = 'Crouching',
+                        Enabled = true
+                    }
+                }));
+            end;
+        end);
     end;
 
     function functions.noStun(toggle)
@@ -636,7 +671,7 @@ do -- // Removals
 	playerMods:AddToggle({
 		text = 'No Fall Damage',
 		tip = 'Removes fall damage for you',
-        callback = functions.NoFall
+        callback = functions.noFall
 	});
 
 	playerMods:AddToggle({
