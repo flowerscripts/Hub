@@ -612,6 +612,7 @@ do -- // Removal Functions
     function functions.noFall(toggle)
         if (not toggle) then
             maid.noFall = nil;
+            maid.noFallCore = nil;
             return;
         end;
 
@@ -625,11 +626,17 @@ do -- // Removal Functions
             FloorMaterial = Humanoid.FloorMaterial;
 
             if (oldFloorMaterial == FloorMaterial) then return; end;
+            
+            if (FloorMaterial == Enum.Material.Air) then
+                maid.noFallCore = RunService.Heartbeat:Connect(function()
+                    LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = true }}))
+                end);
+            end;
 
             if (oldFloorMaterial == Enum.Material.Air) then
-                LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = true }}))
+                task.delay(0.25, function()
+                    maid.noFallCore = nil;
 
-                task.delay(0.1, function()
                     LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = false }}))
                 end);
             end;
