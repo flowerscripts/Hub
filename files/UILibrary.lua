@@ -625,7 +625,12 @@ do -- // Load
 			end
 
 			option.onStateChanged:Fire(state);
-			library.OnFlagChanged:Fire(self);
+			library.OnFlagChanged:Fire({
+				flag = self.flag,
+				text = self.text,
+				value = self.value,
+				state = self.state
+			});
 		end
 
 		task.defer(function()
@@ -1716,7 +1721,11 @@ do -- // Load
 			inputvalue.Text = self.value;
 			self.callback(value, enter);
 
-			library.OnFlagChanged:Fire(self);
+			library.OnFlagChanged:Fire({
+				flag = self.flag,
+				text = self.text,
+				value = self.value
+			});
 		end
 		task.defer(function()
 			if library then
