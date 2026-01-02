@@ -788,15 +788,12 @@ function functions.fullBright(toggle)
     Lighting.Ambient = Color3.fromRGB(255, 255, 255);
 end;
 
-function functions.noBlur(t)
-    Lighting.Blur.Enabled = not t;
-end
-
 do -- // Visuals
-    VisualsMisc:AddToggle({
+    visuals:AddToggle({
         text = 'Full Bright',
         callback = functions.fullBright
-    })VisualsMisc:AddSlider({
+    })
+    visuals:AddSlider({
         flag = 'Full Bright Value',
         textpos = 2,
         min = 0,
