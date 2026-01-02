@@ -605,9 +605,14 @@ local function tweenTeleport(rootPart, position, noWait)
 end;
 
 do -- // Removal Functions
-   function functions.noFall(toggle)
+  local fallStartY = nil;
+    local didCrouch = false;
+
+    function functions.noFall(toggle)
         if (not toggle) then
             maid.noFall = nil;
+            fallStartY = nil;
+            didCrouch = false;
             return;
         end;
 
@@ -620,8 +625,22 @@ do -- // Removal Functions
             local Communicate = Character:FindFirstChild('Communicate');
 
             if (not Humanoid or not Root or not Communicate) then return; end;
-            if (Humanoid.FloorMaterial ~= Enum.Material.Air) then return; end;
+
+            if (Humanoid.FloorMaterial ~= Enum.Material.Air) then
+                fallStartY = nil;
+                didCrouch = false;
+                return;
+            end;
+
+            if (not fallStartY) then
+                fallStartY = Root.Position.Y;
+            end;
+
             if (Root.Velocity.Y >= 0) then return; end;
+
+            local fallDistance = fallStartY - Root.Position.Y;
+            if (fallDistance < 20) then return; end;
+            if (didCrouch) then return; end;
 
             local Params = RaycastParams.new();
             Params.FilterType = Enum.RaycastFilterType.Blacklist;
@@ -629,11 +648,13 @@ do -- // Removal Functions
 
             local Result = workspace:Raycast(
                 Root.Position,
-                Vector3.new(0, -30, 0),
+                Vector3.new(0, -10, 0),
                 Params
             );
 
-            if (Result and Result.Distance <= 18) then
+            if (Result and Result.Distance <= 5) then
+                didCrouch = true;
+
                 Communicate:FireServer(unpack({
                     {
                         InputType = 'Crouching',
