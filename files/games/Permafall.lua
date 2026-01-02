@@ -257,6 +257,8 @@ do -- // Functions
 		params.FilterDescendantsInstances = {workspace.Live, workspace.NPCs};
 		params.FilterType = Enum.RaycastFilterType.Blacklist;
 
+        local myRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('HumanoidRootPart');
+
 		if (not myRootPart or not myRootPart.Parent) then return end;
 
 		local floor = workspace:Raycast(myRootPart.Position, Vector3.new(0, -1000, 0), params);
