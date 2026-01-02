@@ -719,6 +719,10 @@ do -- // Performance Functions
 			end;
 		end);
 	end;
+
+    function functions.chatLogger(toggle)
+		chatLogger:SetVisible(toggle);
+	end;
 end;
 
 do -- // Misc
@@ -737,7 +741,6 @@ do -- // Misc
 	});
 
 	misc:AddDivider('Chat Logger');
-
 
 	misc:AddDivider('Chat Logger', 'You can right click the chatlogger to report infractions.');
 
