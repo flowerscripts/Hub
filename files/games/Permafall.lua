@@ -252,7 +252,7 @@ do -- // Functions
 		until not library.flags.infiniteJump;
 	end;
 
-	function functions.goToGround()
+    function functions.goToGround()
 		local params = RaycastParams.new();
 		params.FilterDescendantsInstances = {workspace.Live, workspace.NPCs};
 		params.FilterType = Enum.RaycastFilterType.Blacklist;
@@ -267,6 +267,60 @@ do -- // Functions
 		myRootPart.CFrame *= CFrame.new(0, -(myRootPart.Position.Y - floor.Position.Y) + 3, 0);
 		myRootPart.Velocity *= Vector3.new(1, 0, 1);
 	end;
+
+    library.OnKeyPress:Connect(function(input, gpe)
+        if (gpe) then return end;
+
+        local key = library.options.attachToBack.key;
+        if (input.KeyCode.Name == key or input.UserInputType.Name == key) then
+            local myRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('HumanoidRootPart');
+            local closest, closestDistance = nil, math.huge;
+
+            if (not myRootPart) then return end;
+
+            repeat
+                for _, entity in next, workspace.Live:GetChildren() do
+                    local rootPart = entity:FindFirstChild('HumanoidRootPart');
+                    if (not rootPart or rootPart == myRootPart) then continue end;
+
+                    local distance = (rootPart.Position - myRootPart.Position).magnitude;
+
+                    if (distance < 300 and distance < closestDistance) then
+                        closest, closestDistance = rootPart, distance;
+                    end;
+                end;
+
+                task.wait();
+            until closest or input.UserInputState == Enum.UserInputState.End;
+            if (input.UserInputState == Enum.UserInputState.End) then return end;
+
+            maid.attachToBack = RunService.Heartbeat:Connect(function()
+                local goalCF = closest.CFrame * CFrame.new(0, library.flags.attachToBackHeight, library.flags.attachToBackSpace);
+
+                local distance = (goalCF.Position - myRootPart.Position).Magnitude;
+                local tweenInfo = TweenInfo.new(distance / 100, Enum.EasingStyle.Linear);
+
+                local tween = TweenService:Create(myRootPart, tweenInfo, {
+                    CFrame = goalCF
+                });
+
+                tween:Play();
+
+                maid.attachToBackTween = function()
+                    tween:Cancel();
+                end;
+            end);
+        end;
+	end);
+
+    library.OnKeyRelease:Connect(function(input)
+        local key = library.options.attachToBack.key;
+
+        if (input.KeyCode.Name == key or input.UserInputType.Name == key) then
+            maid.attachToBack = nil;
+            maid.attachToBackTween = nil;
+        end;
+    end);
 end;
 
 -- NoClip
@@ -521,10 +575,11 @@ do -- // Removal Functions
             return;
         end;
 
+        local character = LocalPlayer.Character;
+
         maid.antiFire = character.Values.OnFire.Changed:Connect(function(boolean)
-            print(boolean);
             if(boolean) then
-                LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{ Enabled = true,  Character = character,  InputType = "Dash"  }}))
+                character:WaitForChild("Communicate"):FireServer(unpack({{ Enabled = true,  Character = character,  InputType = "Dash"  }}))
             end;
         end);
     end;
@@ -561,63 +616,6 @@ do -- // Removals
 		tip = 'Like no stun but it\'s less blatant',
         callback = functions.noStunLessBlatant
 	});
-end;
-
-do -- // Attach to bbackkk
-    
-    library.OnKeyPress:Connect(function(input, gpe)
-        if (gpe) then return end;
-
-        local key = library.options.attachToBack.key;
-        if (input.KeyCode.Name == key or input.UserInputType.Name == key) then
-            local myRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('HumanoidRootPart');
-            local closest, closestDistance = nil, math.huge;
-
-            if (not myRootPart) then return end;
-
-            repeat
-                for _, entity in next, workspace.Live:GetChildren() do
-                    local rootPart = entity:FindFirstChild('HumanoidRootPart');
-                    if (not rootPart or rootPart == myRootPart) then continue end;
-
-                    local distance = (rootPart.Position - myRootPart.Position).magnitude;
-
-                    if (distance < 300 and distance < closestDistance) then
-                        closest, closestDistance = rootPart, distance;
-                    end;
-                end;
-
-                task.wait();
-            until closest or input.UserInputState == Enum.UserInputState.End;
-            if (input.UserInputState == Enum.UserInputState.End) then return end;
-
-            maid.attachToBack = RunService.Heartbeat:Connect(function()
-                local goalCF = closest.CFrame * CFrame.new(0, library.flags.attachToBackHeight, library.flags.attachToBackSpace);
-
-                local distance = (goalCF.Position - myRootPart.Position).Magnitude;
-                local tweenInfo = TweenInfo.new(distance / 100, Enum.EasingStyle.Linear);
-
-                local tween = TweenService:Create(myRootPart, tweenInfo, {
-                    CFrame = goalCF
-                });
-
-                tween:Play();
-
-                maid.attachToBackTween = function()
-                    tween:Cancel();
-                end;
-            end);
-        end;
-	end);
-
-    library.OnKeyRelease:Connect(function(input)
-        local key = library.options.attachToBack.key;
-
-        if (input.KeyCode.Name == key or input.UserInputType.Name == key) then
-            maid.attachToBack = nil;
-            maid.attachToBackTween = nil;
-        end;
-    end);
 end;
 
 do -- // Local Cheats
@@ -735,7 +733,6 @@ do -- // Local Cheats
 	});
 end;
 
-
 do --// Notifier
 	notifier:AddToggle({
 		text = 'Mod Notifier',
@@ -776,7 +773,6 @@ do -- // Misc
 end;
 
 local oldAmbient, oldBritghtness = Lighting.Ambient, Lighting.Brightness;
-
 function functions.fullBright(toggle)
     if(not toggle) then
         maid.fullBright = nil;
@@ -792,13 +788,15 @@ function functions.fullBright(toggle)
     Lighting.Ambient = Color3.fromRGB(255, 255, 255);
 end;
 
+function functions.noBlur(t)
+    Lighting.Blur.Enabled = not t;
+end
 
 do -- // Visuals
     VisualsMisc:AddToggle({
         text = 'Full Bright',
         callback = functions.fullBright
-    })
-    VisualsMisc:AddSlider({
+    })VisualsMisc:AddSlider({
         flag = 'Full Bright Value',
         textpos = 2,
         min = 0,
