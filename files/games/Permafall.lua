@@ -647,7 +647,7 @@ do -- // Local Cheats
 		textpos = 2
 	});
 end;
-
+print('before notifier')
 do --// Notifier
 	notifier:AddToggle({
 		text = 'Mod Notifier',
@@ -670,55 +670,11 @@ do --// Notifier
 		callback = functions.playerProximityCheck
 	});
 end
-
+print('aftewre')
 do -- // Performance Functions
     function functions.disableShadows(t)
         Lighting.GlobalShadows = not t;
     end;
-
-     do -- // FPS Boost
-		local fpsBoostMaid = Maid.new();
-		local hooked = {};
-
-		function functions.fpsBoost(t)
-			table.clear(hooked);
-		end;
-
-		task.spawn(function()
-			if (isSynapseV3) then return warn('warning: we do not run fps boost on syn v3!'); end;
-			while task.wait(1) do
-				for _, v in next, getconnections(RunService.RenderStepped) do
-					if (not v.Function) then continue end;
-					local conScript = getinstancefromstate(v.State);
-					if (not conScript or not checkName(conScript.Name)) then continue end;
-					if (hooked[v.Function]) then continue end;
-					fpsBoostMaid[conScript] = nil;
-
-					local f = v.Function;
-
-					hooked[f] = true;
-
-					if (not library.flags.fpsBoost) then
-						v:Enable();
-					else
-						v:Disable();
-						fpsBoostMaid[conScript] = stepped:Connect(function(_, dt)
-							if (not v.Function) then
-								fpsBoostMaid[conScript] = nil;
-								hooked[f] = nil;
-								v:Enable();
-								return print('no more func!');
-							end;
-
-							setscriptes(conScript);
-							set_thread_identity(2);
-							pcall(v.Function, dt);
-						end);
-					end;
-				end;
-			end;
-		end);
-	end;
 
     function functions.chatLogger(toggle)
 		chatLogger:SetVisible(toggle);
@@ -727,12 +683,6 @@ end;
 
 do -- // Misc
 	misc:AddDivider('Perfomance Improvements');
-
-	misc:AddToggle({
-		text = 'FPS Boost',
-		tip = 'Improves FPS by making game functions faster',
-		callback = functions.fpsBoost
-	});
 
 	misc:AddToggle({
 		text = 'Disable Shadows',
