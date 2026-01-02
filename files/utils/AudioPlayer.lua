@@ -58,7 +58,7 @@ local RunService = Services:Get('RunService');
 				end;
 			end;
 
-			self._sound.SoundId = getasset(filePath);
+			self._sound.SoundId = getcustomasset(filePath);
 		end;
 
 		if (options.autoPlay) then
