@@ -307,7 +307,10 @@ do -- // Functions
 		myRootPart.Velocity *= Vector3.new(1, 0, 1);
 	end;
 
-    library.OnKeyPress:Connect(function(input, gpe)
+    task.spawn(function()
+        repeat task.wait() until isLoadedFully;
+
+        library.OnKeyPress:Connect(function(input, gpe)
         if (gpe) then return end;
 
         local key = library.options.attachToBack.key;
@@ -353,13 +356,14 @@ do -- // Functions
 	end);
 
     library.OnKeyRelease:Connect(function(input)
-        repeat task.wait() until isLoadedFully;
+        
         local key = library.options.attachToBack.key;
 
         if (input.KeyCode.Name == key or input.UserInputType.Name == key) then
             maid.attachToBack = nil;
             maid.attachToBackTween = nil;
         end;
+    end);
     end);
 end;
 
