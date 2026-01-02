@@ -72,6 +72,8 @@ local visuals = column2:AddSection('Visuals');
 local farms = column2:AddSection('Farms');
 local inventoryViewer = column2:AddSection('Inventory Viewer');
 
+local IsAntiCheatAlright = false;
+
 do -- // Anti Cheat Update Check
     maid.antiCheatChecker = LocalPlayer.Character.HumanoidRootPart.ChildAdded:Connect(function(child)
         if(child:IsA('BodyMover')) then
@@ -83,6 +85,7 @@ do -- // Anti Cheat Update Check
                 ]])
             else
                 maid.antiCheatChecker = nil;
+                IsAntiCheatAlright = true;
                 print('Passed anti cheat check!');
             end;
         end;
@@ -90,6 +93,8 @@ do -- // Anti Cheat Update Check
 
     LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{ Enabled = true,  Character = LocalPlayer.Character,  InputType = "Dash"  }}));
 end;
+
+repeat task.wait() until IsAntiCheatAlright;
 
 
 do -- // Inventory Viewer (SMH)
@@ -861,33 +866,25 @@ end;
 
 local NPCs = workspace.NPCs;
 
-local Armors, Weapons = {}, {};
-local ArmorSelected, WeaponSelected;
-
+local Armors, Weapons, Items = {}, {}, {};
+local ArmorSelected, WeaponSelected, ItemSelected;
 
 do -- // Load All Buyables
-
-    -- // Armor
     for _, child in NPCs:GetChildren() do
-        if (child.Name == 'Purchasable' and child:FindFirstChild('Clothing')) then
+        if (child.Name == 'Purchasable') then
             local PurchaseInfo = child.PurchaseInfo;
+            local ItemType = PurchaseInfo.ItemType;
             local ItemName = PurchaseInfo.ItemName;
 
-            Armors[ItemName.Value] = true;
+            if (ItemType.Value == 'Armor') then
+                Armors[ItemName.Value] = true;
+            elseif (ItemType.Value == 'Weapon') then
+                Weapons[ItemName.Value] = true;
+            elseif (ItemType.Value == 'Item') then
+                Items[ItemName.Value] = true;
+            end;
         end;
     end;
-
-    -- // Weapons
-
-      for _, child in NPCs:GetChildren() do
-        if (child.Name == 'Purchasable' and not child:FindFirstChild('Clothing')) then
-            local PurchaseInfo = child.PurchaseInfo;
-            local ItemName = PurchaseInfo.ItemName;
-
-            Weapons[ItemName.Value] = true;
-        end;
-    end;
-
 end;
 
 do -- // Opens the dialogue for the selected Armor.
@@ -918,7 +915,6 @@ do -- // Misc
         end,
     });
 
-
     misc:AddButton({
 		text = 'Buy Armor',
 		tip = 'Buys the Armor you selected.',
@@ -937,12 +933,29 @@ do -- // Misc
         end,
     });
 
-
     misc:AddButton({
 		text = 'Buy Weapon',
 		tip = 'Buys the Weapon you selected.',
         callback = function()
             functions.buyItem(WeaponSelected);
+        end,
+	});
+
+    misc:AddList({
+        text = 'Select Item',
+        tip = 'Select the Item you wish to buy.',
+        values = Items;
+        multiselect = false,
+        callback = function(name)
+            ItemSelected = name;
+        end,
+    });
+
+    misc:AddButton({
+		text = 'Buy Item',
+		tip = 'Buys the Item you selected.',
+        callback = function()
+            functions.buyItem(ItemSelected);
         end,
 	});
 
