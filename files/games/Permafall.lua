@@ -58,8 +58,6 @@ local oldAmbient, oldBrightness;
 
 local BodyMoverTag = 'good';
 
-local isLoadedFully = false;
-
 local myRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('HumanoidRootPart');
 
 local maid = Maid.new();
@@ -288,9 +286,7 @@ do -- // Functions
 	end;
 
     library.OnKeyPress:Connect(function(input, gpe)
-        if (gpe) then return end;
-
-        repeat task.wait() until library.options and library.options.attachToBack;
+        if (gpe or not library.options.attachToBack) then return end;
 
         local key = library.options.attachToBack.key;
         if (input.KeyCode.Name == key or input.UserInputType.Name == key) then
@@ -335,7 +331,7 @@ do -- // Functions
 	end);
 
     library.OnKeyRelease:Connect(function(input)
-       local key = library.options.attachToBack.key;
+        local key = library.options.attachToBack.key;
 
         if (input.KeyCode.Name == key or input.UserInputType.Name == key) then
             maid.attachToBack = nil;
@@ -950,7 +946,7 @@ do -- // Misc
 
     misc:AddDivider('NPCs');
 
-     misc:AddList({
+    misc:AddList({
         text = 'Select NPC',
         tip = 'Select the NPC you wish to interact with.',
         values = NPCs;
@@ -964,7 +960,7 @@ do -- // Misc
 		text = 'Interact with NPC',
 		tip = 'Interacts with the NPC you selected.',
         callback = function()
-            functions.interactWithNPC(ItemSelected);
+            functions.interactWithNPC(NPCSelected);
         end,
 	});
 
@@ -1004,5 +1000,3 @@ do -- // Visuals
         callback = functions.fullBright
     })
 end;
-
-isLoadedFully = true;
