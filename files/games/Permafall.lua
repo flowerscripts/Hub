@@ -346,7 +346,7 @@ local chatLogger = TextLogger.new({
 local assetsList = {'ModeratorJoin.mp3', 'ModeratorLeft.mp3'};
 local audios = {};
 
-local apiEndpoint = USE_INSECURE_ENDPOINT and 'https://rukiascripts.xyz/';
+local apiEndpoint = 'https://rukiascripts.xyz/';
 
 for i, v in next, assetsList do
 	audios[v] = AudioPlayer.new({
