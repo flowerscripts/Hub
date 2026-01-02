@@ -612,10 +612,9 @@ do -- // Removal Functions
         end;
 
         local Humanoid = LocalPlayer.Character.Humanoid;
-        local HumanoidRootPart = LocalPlayer.Character.HumanoidRootPart;
 
         local FloorMaterial = Humanoid.FloorMaterial;
-        local OldPosition = HumanoidRootPart.Position;
+        local OldPosition   = LocalPlayer.Character.HumanoidRootPart.Position;
 
         maid.noFall = Humanoid:GetPropertyChangedSignal('FloorMaterial'):Connect(function()
             local oldFloorMaterial = FloorMaterial;
@@ -624,20 +623,11 @@ do -- // Removal Functions
             if (oldFloorMaterial == FloorMaterial) then return; end;
 
             if (oldFloorMaterial == Enum.Material.Air) then
-                local CurrentPosition = HumanoidRootPart.Position;
-                local FallDistance = OldPosition.Y - CurrentPosition.Y;
-                
-                if (FallDistance >= 20) then
-                    LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = true }}))
+                LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = true }}))
 
-                    task.delay(0.1, function()
-                        LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = false }}))
-                    end);
-                end;
-                
-                OldPosition = CurrentPosition;
-            else
-                OldPosition = HumanoidRootPart.Position;
+                task.delay(0.1, function()
+                    LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = false }}))
+                end);
             end;
         end);
     end;
