@@ -617,34 +617,17 @@ do -- // Removal Functions
         end;
 
         local Humanoid = LocalPlayer.Character.Humanoid;
+        local InAir = false;
 
-        local FloorMaterial = Humanoid.FloorMaterial;
-        local OldPosition   = LocalPlayer.Character.HumanoidRootPart.Position;
-
-        maid.noFall = Humanoid:GetPropertyChangedSignal('FloorMaterial'):Connect(function()
-            local oldFloorMaterial = FloorMaterial;
-            FloorMaterial = Humanoid.FloorMaterial;
-
-            if (oldFloorMaterial == FloorMaterial) then return; end;
-            
-            if (FloorMaterial == Enum.Material.Air) then
-                maid.noFallCore = RunService.Heartbeat:Connect(function()
-                    LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = true }}))
-
-                    print('no FALL LEGIT CORE WOW')
-                end);
+        maid.noFall = RunService.Heartbeat:Connect(function()            
+            if (Humanoid.FloorMaterial == Enum.Material.Air) then
+                LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = true }}))
             end;
 
             if (oldFloorMaterial == Enum.Material.Air) then
-                print("HELLO")
-                LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = true }}))
-                
-                task.delay(1, function()
-                    print('s2nd hello')
-                    maid.noFallCore = nil;
-
+                if (InAir and LocalPlayer.Character:FindFirstChild('Crouching')) then
                     LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = false }}))
-                end);
+                end;
             end;
         end);
     end;
