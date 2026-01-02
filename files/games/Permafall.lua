@@ -816,5 +816,8 @@ do -- // Visuals
         min = 0,
         max = 10,
         value = 1,
+        callback = function(value)
+			Lighting.Brightness = (value or 1) * 0.1;
+		end,
     });
 end;
