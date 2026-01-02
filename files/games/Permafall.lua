@@ -630,13 +630,17 @@ do -- // Removal Functions
             if (FloorMaterial == Enum.Material.Air) then
                 maid.noFallCore = RunService.Heartbeat:Connect(function()
                     LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = true }}))
+
+                    print('no FALL LEGIT CORE WOW')
                 end);
             end;
 
             if (oldFloorMaterial == Enum.Material.Air) then
+                print("HELLO")
                 LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = true }}))
                 
                 task.delay(1, function()
+                    print('s2nd hello')
                     maid.noFallCore = nil;
 
                     LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = false }}))
