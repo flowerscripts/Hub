@@ -72,37 +72,6 @@ local visuals = column2:AddSection('Visuals');
 local farms = column2:AddSection('Farms');
 local inventoryViewer = column2:AddSection('Inventory Viewer');
 
-local IsAntiCheatAlright = false;
-
-do -- // Anti Cheat Update Check
-    maid.antiCheatChecker = LocalPlayer.Character.HumanoidRootPart.ChildAdded:Connect(function(child)
-        if(child:IsA('BodyMover')) then
-            if(not child:HasTag('good')) then
-                return LocalPlayer:Kick([[
-                    
-                Error Code #54:
-                The Anti-Cheat has been modified! The script will be disabled until I update it.
-                ]])
-            else
-                maid.antiCheatChecker = nil;
-                IsAntiCheatAlright = true;
-                print('Passed anti cheat check!');
-            end;
-        end;
-    end);
-
-    repeat task.wait() until maid.antiCheatChecker;
-
-    LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{ Enabled = true,  Character = LocalPlayer.Character,  InputType = "Dash"  }}));
-
-    task.delay(1, function()
-        LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{ Enabled = true,  Character = LocalPlayer.Character,  InputType = "Dash"  }}));
-    end);
-end;
-
-repeat task.wait() until IsAntiCheatAlright;
-
-
 do -- // Inventory Viewer (SMH)
     local inventoryLabels = {};
     local itemColors = {};
@@ -320,6 +289,8 @@ do -- // Functions
 
     library.OnKeyPress:Connect(function(input, gpe)
         if (gpe) then return end;
+
+        repeat task.wait() until library.options and library.options.attachToBack;
 
         local key = library.options.attachToBack.key;
         if (input.KeyCode.Name == key or input.UserInputType.Name == key) then
@@ -886,7 +857,7 @@ do -- // Load All Buyables
                 Armors[ItemName.Value] = true;
             elseif (ItemType.Value == 'Weapon') then
                 Weapons[ItemName.Value] = true;
-            elseif (ItemType.Value == 'Item') then
+            elseif (ItemType.Value == 'Item' or ItemType.Value == 'Trinket') then
                 Items[ItemName.Value] = true;
             end;
         end;
