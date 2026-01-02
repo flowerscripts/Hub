@@ -331,6 +331,7 @@ do -- // Functions
 	end);
 
     library.OnKeyRelease:Connect(function(input)
+        if (not library.options.attachToBack) then return end;
         local key = library.options.attachToBack.key;
 
         if (input.KeyCode.Name == key or input.UserInputType.Name == key) then
@@ -837,13 +838,13 @@ do -- // Performance Functions
 end;
 
 
-local NPCs = workspace.NPCs;
+local NPCFolder = workspace.NPCs;
 
 local Armors, Weapons, Items, NPCs = {}, {}, {}, {};
 local ArmorSelected, WeaponSelected, ItemSelected, NPCSelected;
 
 do -- // Load All Buyables
-    for _, child in NPCs:GetChildren() do
+    for _, child in NPCFolder:GetChildren() do
         if (child.Name == 'Purchasable') then
             local PurchaseInfo = child.PurchaseInfo;
             local ItemType = PurchaseInfo.ItemType;
