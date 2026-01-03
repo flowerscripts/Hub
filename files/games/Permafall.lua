@@ -1109,7 +1109,7 @@ do -- // ESP Functions
             ]]
 
             npcObj = espConstructor.new({code = code, vars = {npc}}, npc.Name);
-            print(npcObj);
+            print(HttpService:JSONEncode(npcObj));
         end;
 
         local connection;
@@ -1121,6 +1121,7 @@ do -- // ESP Functions
         end);
     end;
 end;
+
 
 do -- // ESP Section
     makeESP({
