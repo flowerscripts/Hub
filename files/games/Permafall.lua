@@ -33,8 +33,6 @@ if (game.PlaceId == 126222071643660) then
     return;
 end;
 
-
-
 local column1, column2 = unpack(library.columns);
 
 local functions = {};
@@ -485,15 +483,12 @@ do -- // Auto Sprint
         local lastRan = 0;
 
         maid.autoSprint = UserInputService.InputBegan:Connect(function(input, gpe)
-            if (gpe or tick() - lastRan < 0.35) then return end;
+            if (gpe or tick() - lastRan < 0.25) then return end;
 
             if (table.find(moveKeys, input.KeyCode)) then
                 lastRan = tick();
 
                 VirtualInputManager:SendKeyEvent(true, input.KeyCode, false, game);
-                VirtualInputManager:SendKeyEvent(true, input.KeyCode, false, game);
-
-                --LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{ InputType = "Sprinting",  Enabled = true }}))
             end;
         end);
     end;
@@ -611,25 +606,14 @@ end;
 do -- // Removal Functions
     function functions.noFall(toggle)
         if (not toggle) then
+            maid.noFall:Destroy();
             maid.noFall = nil;
-            maid.noFallCore = nil;
             return;
         end;
 
-        local Humanoid = LocalPlayer.Character.Humanoid;
-        local InAir = false;
-
-        maid.noFall = RunService.Heartbeat:Connect(function()            
-            if (Humanoid.FloorMaterial == Enum.Material.Air) then
-                LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = true }}))
-            end;
-
-            if (oldFloorMaterial == Enum.Material.Air) then
-                if (InAir and LocalPlayer.Character:FindFirstChild('Crouching')) then
-                    LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{  InputType = "Crouching", Enabled = false }}))
-                end;
-            end;
-        end);
+        maid.noFall = Instance.new('Folder');
+        maid.noFall.Name = 'Pressedcontrol';
+        maid.noFall.Parent = LocalPlayer.Character;
     end;
 
     function functions.noStun(toggle)
@@ -762,10 +746,13 @@ do -- // Local Cheats
 
 	localCheats:AddBind({
 		text = 'Instant Log',
-        tip  = 'Not finished',
 		nomouse = true,
 		callback = function()
-			print('NEED TO FIX THIS PLEASE')
+            LocalPlayer.Character.Communicate:FireServer({
+                ["Character"] = LocalPlayer.Character,
+                ["InputType"] = "menu",
+                ["Enabled"] = true
+            })
 		end
 	});
 
