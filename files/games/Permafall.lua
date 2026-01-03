@@ -76,6 +76,12 @@ local visuals = column2:AddSection('Visuals');
 local farms = column2:AddSection('Farms');
 local inventoryViewer = column2:AddSection('Inventory Viewer');
 
+
+local NPCFolder = workspace.NPCs;
+
+local Armors, Weapons, Items, NPCs = {}, {}, {}, {};
+local ArmorSelected, WeaponSelected, ItemSelected, NPCSelected;
+
 do -- // Inventory Viewer (SMH)
     local inventoryLabels = {};
     local itemColors = {};
@@ -827,12 +833,6 @@ do -- // Performance Functions
     end;
 end;
 
-
-local NPCFolder = workspace.NPCs;
-
-local Armors, Weapons, Items, NPCs = {}, {}, {}, {};
-local ArmorSelected, WeaponSelected, ItemSelected, NPCSelected;
-
 do -- // Load All Buyables
     for _, child in NPCFolder:GetChildren() do
         if (child.Name == 'Purchasable') then
@@ -1086,31 +1086,27 @@ do -- // ESP Functions
        
     end;
 
-    function functions.onNewBagAdded()
+    function functions.onDroppedItemAdded()
 
     end;
 
     function functions.onNewNpcAdded(npc, espConstructor)
         local npcObj;
-
         if (IsA(npc, 'BasePart') or IsA(npc, 'MeshPart')) then
-            npcObj = espConstructor.new(npc, {tag = 'Npcs', displayName = npc.Name});
+            npcObj = espConstructor.new(npc, npc.Name);
         else
-
             local code = [[
                 local npc = ...;
                 return setmetatable({}, {
                     __index = function(_, p)
                         if (p == 'Position') then
                             return npc.PrimaryPart and npc.PrimaryPart.Position or npc.WorldPivot.Position
-                        elseif (p == 'Parent') then 
-                            return npc.Parent -- Added so the renderer knows it exists
                         end;
                     end,
                 });
             ]]
 
-            npcObj = espConstructor.new({code = code, vars = {npc}}, {tag = 'Npcs', displayName = npc.Name});
+            npcObj = espConstructor.new({code = code, vars = {npc}}, npc.Name);
         end;
 
         local connection;
@@ -1125,25 +1121,31 @@ end;
 
 
 do -- // ESP Section
-    makeESP({
-        sectionName = 'Trinkets',
-        type = 'descendantAdded',
-        args = workspace.TrinketSpawn,
-        callback = functions.onNewTrinketAdded,
+    function Utility:renderOverload(data)
+        data.espSettings:AddToggle({
+            text = 'Show Danger Timer'
+        });
 
-    });
+        makeESP({
+            sectionName = 'Dropped Items',
+            type = 'tagAdded',
+            args = 'LootDrop',
+            callback = onDroppedItemAdded
+        });
 
-    makeESP({
-        sectionName = 'Bags',
-        type = 'childAdded',
-        args = workspace.Thrown,
-        callback = functions.onNewBagAdded
-    });
+        makeESP({
+            sectionName = 'Trinkets',
+            type = 'descendantAdded',
+            args = workspace.TrinketSpawn,
+            callback = functions.onNewTrinketAdded,
 
-    makeESP({
-        sectionName = 'Npcs',
-        type = 'childAdded',
-        args = workspace.NPCs,
-        callback = functions.onNewNpcAdded
-    });
+        });
+
+        makeESP({
+            sectionName = 'Npcs',
+            type = 'childAdded',
+            args = workspace.NPCs,
+            callback = functions.onNewNpcAdded
+        });
+	end;
 end;
