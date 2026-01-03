@@ -1094,7 +1094,7 @@ do -- // ESP Functions
         local npcObj;
 
         if (IsA(npc, 'BasePart') or IsA(npc, 'MeshPart')) then
-            npcObj = espConstructor.new(npc, npc.Name);
+            npcObj = espConstructor.new(npc, {tag = 'Npcs', displayName = npc.Name});
         else
 
             local code = [[
@@ -1103,13 +1103,14 @@ do -- // ESP Functions
                     __index = function(_, p)
                         if (p == 'Position') then
                             return npc.PrimaryPart and npc.PrimaryPart.Position or npc.WorldPivot.Position
+                        elseif (p == 'Parent') then 
+                            return npc.Parent -- Added so the renderer knows it exists
                         end;
                     end,
                 });
             ]]
 
-            npcObj = espConstructor.new({code = code, vars = {npc}}, npc.Name);
-            print(HttpService:JSONEncode(npcObj));
+            npcObj = espConstructor.new({code = code, vars = {npc}}, {tag = 'Npcs', displayName = npc.Name});
         end;
 
         local connection;
