@@ -850,6 +850,7 @@ do -- // Load All Buyables
         else
             if (not NPCs[child.Name]) then
                 NPCs[child.Name] = true;
+                CollectionService:AddTag(child, 'NPC');
             end;
         end;
     end;
@@ -1091,31 +1092,13 @@ do -- // ESP Functions
     end;
 
     function functions.onNewNpcAdded(npc, espConstructor)
-        local npcObj;
-        if (IsA(npc, 'BasePart') or IsA(npc, 'MeshPart')) then
-            npcObj = espConstructor.new(npc, npc.Name);
-        else
-            local code = [[
-                local npc = ...;
-                return setmetatable({}, {
-                    __index = function(_, p)
-                        if (p == 'Position') then
-                            return npc.PrimaryPart and npc.PrimaryPart.Position or npc.WorldPivot.Position
-                        end;
-                    end,
-                });
-            ]]
+        if (IsA(npc, 'Model')) then
+            local esp = espConstructor.new(npc.Head, npc.Name);
 
-            npcObj = espConstructor.new({code = code, vars = {npc}}, npc.Name);
+            npc.Destroying:Once(function()
+                esp:Destroy();
+            end);
         end;
-
-        local connection;
-        connection = npc:GetPropertyChangedSignal('Parent'):Connect(function()
-            if (not npc.Parent) then
-                npcObj:Destroy();
-                connection:Disconnect();
-            end;
-        end);
     end;
 end;
 
@@ -1123,7 +1106,7 @@ end;
 do -- // ESP Section
     function Utility:renderOverload(data)
         data.espSettings:AddToggle({
-            text = 'Show Danger Timer'
+            text = 'Show Class'
         });
 
         makeESP({
@@ -1142,8 +1125,8 @@ do -- // ESP Section
 
         makeESP({
             sectionName = 'Npcs',
-            type = 'childAdded',
-            args = workspace.NPCs,
+            type = 'tagAdded',
+            args = 'NPC',
             callback = functions.onNewNpcAdded
         });
 	end;
