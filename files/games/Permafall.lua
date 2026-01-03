@@ -1167,7 +1167,6 @@ do -- // ESP Functions
         print('descendant.Name:', descendant.Name)
         print('descendant.Parent:', descendant.Parent)
         
-        -- If it's a Handle, use it directly
         if descendant.Name == 'Handle' then
             print('Is a Handle!')
             
@@ -1192,7 +1191,7 @@ do -- // ESP Functions
                 return 
             end;
 
-        print('Creating ESP for:', trinketData.Name)
+            print('Creating ESP for:', trinketData.Name)
 
             local code = [[
                 local handle = ...;
@@ -1207,14 +1206,14 @@ do -- // ESP Functions
 
             print('Handle type check:', typeof(descendant), descendant:IsA('BasePart'))
             print('Handle position:', descendant.Position)
-
+            
             local espObj = espConstructor.new({ code = code, vars = { descendant } }, trinketData.Name);
             print('ESP object created:', espObj)
             print('ESP object _id:', espObj._id)
             print('ESP object _tag:', espObj._tag)
             print('ESP object _showFlag:', espObj._showFlag)
             print('ESP object _colorFlag:', espObj._colorFlag)
-            
+
             local spawnPart = descendant.Parent;
             local connection;
             connection = spawnPart:GetPropertyChangedSignal('Parent'):Connect(function()
@@ -1268,7 +1267,29 @@ do -- // ESP Section
         sectionName = 'Trinkets',
         type = 'descendantAdded',
         args = workspace.TrinketSpawn,
-        callback = functions.onNewTrinketAdded
+        callback = functions.onNewTrinketAdded,
+        
+        onLoaded = function(section)
+            local trinketToggles = {};
+            
+            -- Create a toggle for each trinket type
+            for _, trinket in ipairs(Trinkets) do
+                local toggle = section:AddToggle({
+                    text = trinket.Name,
+                    flag = 'Show' .. trinket.Name:gsub('%s', ''), -- e.g., 'ShowGoblet', 'ShowPureDiamond'
+                }):AddColor({
+                    flag = trinket.Name:gsub('%s', '') .. 'Color',
+                    color = trinket.Color or Color3.fromRGB(255, 255, 255)
+                });
+                
+                table.insert(trinketToggles, toggle);
+            end;
+            
+            -- Return the list so the main toggle can control their visibility
+            return {
+                list = trinketToggles
+            };
+        end
     });
 
     makeESP({
