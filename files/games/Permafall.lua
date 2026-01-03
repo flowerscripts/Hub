@@ -1274,18 +1274,18 @@ do -- // ESP Section
             
             -- Create a toggle for each trinket type
             for _, trinket in ipairs(Trinkets) do
+                local trinketNameNoSpaces = trinket.Name:gsub('%s', '');
                 local toggle = section:AddToggle({
                     text = trinket.Name,
-                    flag = 'Show' .. trinket.Name:gsub('%s', ''), -- e.g., 'ShowGoblet', 'ShowPureDiamond'
+                    flag = toCamelCase('show' .. trinket.Name),
                 }):AddColor({
-                    flag = trinket.Name:gsub('%s', '') .. 'Color',
+                    flag = toCamelCase(trinket.Name .. 'Color'),
                     color = trinket.Color or Color3.fromRGB(255, 255, 255)
                 });
                 
                 table.insert(trinketToggles, toggle);
             end;
             
-            -- Return the list so the main toggle can control their visibility
             return {
                 list = trinketToggles
             };
