@@ -1,11 +1,8 @@
-print('more')
 local Maid = sharedRequire('utils/Maid.lua');
 local Services = sharedRequire('utils/Services.lua');
 
-print('more 2')
 local toCamelCase = sharedRequire('utils/toCamelCase.lua');
 local library = sharedRequire('UILibrary.lua');
-print('more 3')
 
 	local Players, CorePackages, HttpService = Services:Get('Players', 'CorePackages', 'HttpService');
 	local LocalPlayer = Players.LocalPlayer;
@@ -50,7 +47,7 @@ print('more 3')
 
 	local playerScripts = LocalPlayer:WaitForChild('PlayerScripts')
 
-	--local playerScriptsLoader = playerScripts:FindFirstChild('PlayerScriptsLoader');
+	local playerScriptsLoader = playerScripts:FindFirstChild('PlayerScriptsLoader');
 	local actors = {};
 
 	local readyCount = 0;
