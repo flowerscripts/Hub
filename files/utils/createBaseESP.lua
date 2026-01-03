@@ -47,7 +47,7 @@ local library = sharedRequire('UILibrary.lua');
 
 	local playerScripts = LocalPlayer:WaitForChild('PlayerScripts')
 
-	--local playerScriptsLoader = playerScripts:FindFirstChild('PlayerScriptsLoader');
+	local playerScriptsLoader = playerScripts:FindFirstChild('PlayerScriptsLoader');
 	local actors = {};
 
 	local readyCount = 0;
