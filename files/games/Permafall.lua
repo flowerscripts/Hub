@@ -1177,7 +1177,7 @@ do -- // ESP Functions
     function functions.onNewNpcAdded(npc, espConstructor)
         local npcObj;
 
-        if (IsA(npc, 'Model') and not npc.Name == 'Purchasable') then
+        if (IsA(npc, 'BasePart') or IsA(npc, 'MeshPart')) then
             npcObj = espConstructor.new(npc, npc.Name);
         else
             local code = [[
