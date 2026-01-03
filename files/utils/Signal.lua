@@ -31,34 +31,28 @@ end;
 -- @param ... Variable arguments to pass to handler
 -- @treturn nil
 function Signal:Fire(...)
-	self._argData = {...}
-	self._argCount = select("#", ...)
-	self._bindableEvent:Fire()
-	self._argData = nil
-	self._argCount = nil
+    local args = {...}
+    local count = select("#", ...)
+    
+    -- Instead of setting and clearing self._argData, 
+    -- we trigger the event which will have access to these local variables
+    self._argCount = count
+    self._argData = args
+    self._bindableEvent:Fire()
 end
 
---- Connect a new handler to the event. Returns a connection object that can be disconnected.
--- @tparam function handler Function handler called with arguments passed when `:Fire(...)` is called
--- @treturn Connection Connection object that can be disconnected
 function Signal:Connect(handler)
-    if not self._bindableEvent then return error("Signal has been destroyed"); end
-
-    if not (type(handler) == "function") then
-        error(("connect(%s)"):format(typeof(handler)), 2)
-    end
+    if not self._bindableEvent then return error("Signal has been destroyed") end
 
     return self._bindableEvent.Event:Connect(function()
-        -- Capture the data locally before it's cleared by :Fire()
+        -- Capture the current state of the signal's data
         local data = self._argData
         local count = self._argCount
-        
         if data then
             handler(unpack(data, 1, count))
         end
     end)
 end
-
 --- Wait for fire to be called, and return the arguments it was given.
 -- @treturn ... Variable arguments from connection
 function Signal:Wait()
