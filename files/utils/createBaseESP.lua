@@ -127,8 +127,7 @@ local library = sharedRequire('UILibrary.lua');
 			end;
 		end);
 
-		local createBaseESPParallel = sharedRequire('utils/createBaseESPParallel.lua');
-		createBaseESPParallel(commId);
+		loadstring(sharedRequire('utils/createBaseESPParallel.lua'))(commId);
 
 		table.insert(actors, {commEvent = commEvent});
 		readyCount = 1;
