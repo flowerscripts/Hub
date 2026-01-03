@@ -1130,15 +1130,14 @@ do -- // ESP Section
             sectionName = 'Dropped Items',
             type = 'tagAdded',
             args = 'LootDrop',
-            callback = onDroppedItemAdded
+            callback = functions.onDroppedItemAdded
         });
 
         makeESP({
             sectionName = 'Trinkets',
             type = 'descendantAdded',
             args = workspace.TrinketSpawn,
-            callback = functions.onNewTrinketAdded,
-
+            callback = functions.onNewTrinketAdded
         });
 
         makeESP({
