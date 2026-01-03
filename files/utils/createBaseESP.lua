@@ -204,8 +204,21 @@ local library = sharedRequire('UILibrary.lua');
 				end;
 			end;
 
-			local smallData = table.clone(self);
-			smallData._actor = nil;
+			local smallData = {
+				_id = self._id,
+				_tag = tag,
+				_instance = instance,
+				_color = color or whiteColor,
+				_isLazy = isLazy,
+				_text = displayName,
+				_showFlag = toCamelCase('Show ' .. (typeof(tag) == 'table' and tag.tag or tag)),
+				_maxDistanceFlag = maxDistanceFlag,
+				_showHealthFlag = showHealthFlag,
+				_colorFlag = toCamelCase((typeof(tag) == 'table' and tag.tag or tag) .. ' Color'),
+				_colorFlag2 = BaseEsp.Flag .. 'Color',
+				_showDistanceFlag = BaseEsp.Flag .. 'ShowDistance',
+			}
+
 			self._actor.commEvent:Fire({
 				updateType = 'new',
 				data = smallData,
