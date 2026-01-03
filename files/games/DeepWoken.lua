@@ -90,7 +90,7 @@ local ReplicatedStorage, Players, RunService, CollectionService, Lighting, UserI
     'NetworkClient',
     'GuiService'
 );
-local droppedItemsNames = originalFunctions.jsonDecode(HttpService, sharedRequire('games/DeepwokenItemsNames.json'));
+local droppedItemsNames = originalFunctions.jsonDecode(HttpService, sharedRequire('games/DeepWokenItemNames.json'));
 
 local LocalPlayer = Players.LocalPlayer;
 local playerMouse = LocalPlayer:GetMouse();
