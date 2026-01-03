@@ -1079,158 +1079,11 @@ do -- // Player Classes
     }
 end;
 
-local function normalizeId(id)
-    return tostring(id):gsub('%D', '');
-end;
-
-local function getHandleMeshInfo(handle)
-    local mesh = FindFirstChild(handle, 'Mesh');
-    if (not mesh) then return nil; end;
-
-    return {
-        MeshId = mesh.MeshId;
-        MeshType = mesh.MeshType.Name;
-    };
-end;
-
-local function resolveTrinketFromHandle(handle)
-    if (not handle or not IsA(handle, 'BasePart')) then
-        return nil;
-    end;
-
-    local meshInfo = getHandleMeshInfo(handle);
-    if (not meshInfo) then
-        return nil;
-    end;
-
-    local handleColor = handle.Color;
-
-    -- First loop: MeshType matching
-    for _, trinket in ipairs(Trinkets) do
-        if (trinket.MeshType) then
-            if (trinket.MeshType == meshInfo.MeshType) then
-                if (trinket.Color) then
-                    if (handleColor == trinket.Color) then
-                        return trinket;
-                    end;
-                elseif (trinket.VertexColor) then
-                    local trinketColor = Color3.new(trinket.VertexColor.X, trinket.VertexColor.Y, trinket.VertexColor.Z);
-                    if (handleColor == trinketColor) then
-                        return trinket;
-                    end;
-                else
-                    return trinket;  -- No color requirement, return immediately
-                end;
-            end;
-        end;
-    end;
-
-    -- Second loop: MeshId matching
-    for _, trinket in ipairs(Trinkets) do
-        if (trinket.MeshId) then
-            if (normalizeId(trinket.MeshId) == normalizeId(meshInfo.MeshId)) then
-                print('  -> MeshId MATCH for:', trinket.Name)
-                if (trinket.Color) then
-                    print('  -> Has Color, checking match')
-                    if (handleColor == trinket.Color) then
-                        print('  -> COLOR MATCH! Returning:', trinket.Name)
-                        return trinket;
-                    else
-                        print('  -> Color mismatch, continuing')
-                    end;
-                elseif (trinket.VertexColor) then
-                    print('  -> Has VertexColor, checking match')
-                    local trinketColor = Color3.new(trinket.VertexColor.X, trinket.VertexColor.Y, trinket.VertexColor.Z);
-                    if (handleColor == trinketColor) then
-                        print('  -> VERTEXCOLOR MATCH! Returning:', trinket.Name)
-                        return trinket;
-                    else
-                        print('  -> VertexColor mismatch, continuing')
-                    end;
-                else
-                    print('  -> No color requirement! Returning:', trinket.Name)
-                    return trinket;
-                end;
-            end;
-        end;
-    end;
-
-    print('Reached end of function, returning nil')
-    return nil;
-end;
 
 
 do -- // ESP Functions
     function functions.onNewTrinketAdded(descendant, espConstructor)
-        print('=== onNewTrinketAdded called ===')
-        print('descendant:', descendant)
-        print('descendant.Name:', descendant.Name)
-        print('descendant.Parent:', descendant.Parent)
-        
-        if descendant.Name == 'Handle' then
-            print('Is a Handle!')
-            
-            if not descendant.Parent then
-                print('No parent, returning')
-                return
-            end
-            
-            print('Parent name:', descendant.Parent.Name)
-            
-            if descendant.Parent.Name ~= 'SPAWN' then
-                print('Parent is not SPAWN, returning')
-                return
-            end
-            
-            print('Calling resolveTrinketFromHandle...')
-            local trinketData = resolveTrinketFromHandle(descendant);
-            print('trinketData result:', trinketData)
-            
-            if (not trinketData) then 
-                print('wow - no trinket data')
-                return 
-            end;
-
-            print('Creating ESP for:', trinketData.Name)
-
-            local code = [[
-                local handle = ...;
-                return setmetatable({}, {
-                    __index = function(_, p)
-                        if (p == 'Position') then
-                            return handle.Position;
-                        end;
-                    end,
-                });
-            ]];
-
-            print('Handle type check:', typeof(descendant), descendant:IsA('BasePart'))
-            print('Handle position:', descendant.Position)
-            
-            local espObj = espConstructor.new({ code = code, vars = { descendant } }, trinketData.Name);
-            print('ESP object created:', espObj)
-            print('ESP object _id:', espObj._id)
-            print('ESP object _tag:', espObj._tag)
-            print('ESP object _showFlag:', espObj._showFlag)
-            print('ESP object _colorFlag:', espObj._colorFlag)
-
-            -- Check if the flags are enabled
-            print('Checking flags:')
-            print('  Main toggle (Trinkets):', library.flags.Trinkets or library.flags.trinkets)
-            print('  Show flag (' .. espObj._showFlag .. '):', library.flags[espObj._showFlag])
-            print('  Color flag (' .. espObj._colorFlag .. '):', library.flags[espObj._colorFlag])
-
-            local spawnPart = descendant.Parent;
-            local connection;
-            connection = spawnPart:GetPropertyChangedSignal('Parent'):Connect(function()
-                if (not spawnPart.Parent) then
-                    espObj:Destroy();
-                    connection:Disconnect();
-                end;
-            end);
-            
-            print('ESP setup complete!')
-        end
+       
     end;
 
     function functions.onNewBagAdded()
@@ -1274,28 +1127,7 @@ do -- // ESP Section
         type = 'descendantAdded',
         args = workspace.TrinketSpawn,
         callback = functions.onNewTrinketAdded,
-        
-        onLoaded = function(section)
-            local trinketToggles = {};
-            
-            for _, trinket in ipairs(Trinkets) do
-                local toggle = section:AddToggle({
-                    text = trinket.Name,
-                    flag = toCamelCase('show ' .. trinket.Name),
-                }):AddColor({
-                    flag = toCamelCase(trinket.Name .. ' Color'),
-                    color = trinket.Color or Color3.fromRGB(255, 255, 255)
-                });
-                
-                print('Created toggle for:', trinket.Name, 'with flag:', toCamelCase('show ' .. trinket.Name))
-                
-                table.insert(trinketToggles, toggle);
-            end;
-            
-            return {
-                list = trinketToggles
-            };
-        end
+
     });
 
     makeESP({
@@ -1312,8 +1144,3 @@ do -- // ESP Section
         callback = functions.onNewNpcAdded
     });
 end;
-
--- Add this to test if flags work
-    task.wait(2)
-    print('Testing Goblet flag:', library.flags['show Goblet'])
-    print('Testing main toggle:', library.flags.trinkets)
