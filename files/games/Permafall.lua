@@ -58,6 +58,14 @@ local BodyMoverTag = 'good';
 
 local myRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('HumanoidRootPart');
 
+local IsA = game.IsA;
+local FindFirstChild = game.FindFirstChild;
+local FindFirstChildWhichIsA = game.FindFirstChildWhichIsA;
+local IsDescendantOf = game.IsDescendantOf;
+
+local Trinkets = {};
+local playerClassesList = {};
+
 local maid = Maid.new();
 
 local localCheats = column1:AddSection('Local Cheats');
@@ -606,13 +614,12 @@ end;
 do -- // Removal Functions
     function functions.noFall(toggle)
         if (not toggle) then
-            maid.noFall:Destroy();
             maid.noFall = nil;
             return;
         end;
 
         maid.noFall = Instance.new('Folder');
-        maid.noFall.Name = 'Pressedcontrol';
+        maid.noFall.Name = 'PressedControl';
         maid.noFall.Parent = LocalPlayer.Character;
     end;
 
@@ -983,4 +990,211 @@ do -- // Visuals
         text = 'Full Bright',
         callback = functions.fullBright
     })
+end;
+
+local areaNames = {
+    'Bossfight';
+    'Boxing Bar';
+    'Camp';
+    'Castle';
+    'Cliffs';
+    'DungeonEntrance';
+    'HideoutOrderly';
+    'Loading';
+    'SecretDoor';
+    'Sky Islands';
+    'Tavern';
+}
+
+-- // Trinket Data :: Name -> MeshId
+-- // ------- If Trinket has same MeshId we then check the Handle Color to determine which one it is.
+-- // workspace.TrinketSpawn.SPAWN.Handle.Mesh (Handle is where the UI will be placed and Mesh is how we determine which Trinket it is.)
+
+do -- // Set Trinket Data
+    Trinkets = {
+        {
+            ['MeshId'] = 'rbxassetid://13116112';
+            ['Name'] = 'Goblet';
+        },
+
+        {
+            ['MeshId'] = 'rbxassetid://2877143560';
+            ['Name'] = 'Amethyst';
+            ['Color'] = Color3.fromRGB(167, 95, 209);
+        },
+
+        {
+            ['MeshId'] = 'rbxassetid://2877143560';
+            ['Name'] = 'Diamond';
+            ['Color'] = Color3.fromRGB(248, 248, 248);
+        },
+
+        {
+            ['MeshId'] = 'rbxassetid://2877143560';
+            ['Name'] = 'Sapphire';
+            ['Color'] = Color3.fromRGB(0, 0, 255);
+        },
+
+        {
+            ['MeshId'] = 'rbxassetid://2877143560';
+            ['Name'] = 'Pure Diamond';
+            ['Color'] = Color3.fromRGB(18, 238, 212);
+        },
+
+        {
+            ['MeshId'] = 'rbxassetid://2877143560';
+            ['Name'] = 'Ruby';
+            ['Color'] = Color3.fromRGB(255, 0, 0);
+        },
+
+        {
+            ['MeshId'] = 'rbxassetid://2877143560';
+            ['Name'] = 'Emerald';
+            ['Color'] = Color3.fromRGB(31, 128, 29);
+        },
+
+        {
+            ['Name'] = 'Opal';
+            ['MeshType'] = 'Sphere';
+            ['VertexColor'] = Vector3.new(1, 1, 1);
+        },
+
+        {
+            ['Name'] = 'Scroll';
+            ['MeshId'] = 'rbxassetid://60791940';
+        },
+
+        {
+            ['Name'] = 'Ring';
+            ['MeshId'] = 'rbxassetid://2637545558';
+        },
+    };
+end;
+
+do -- // Player Classes
+    playerClassesList = {
+        ['Brawler'] = {
+            ['Active'] = {'Body Grinder', 'Bruising Drop', 'Rib Crusher', 'Swift Kick'};
+        }
+    }
+end;
+
+local function resolveTrinket(handle)
+    if (not handle) then
+        return nil;
+    end;
+
+    local mesh = FindFirstChildWhichIsA(handle, 'SpecialMesh');
+    if (not mesh) then
+        return nil;
+    end;
+
+    local meshId = mesh.MeshId;
+    local color = handle.Color;
+    local vertexColor = mesh.VertexColor;
+
+    for _, trinket in ipairs(Trinkets) do
+        if (trinket.MeshId and trinket.MeshId == meshId) then
+            if (trinket.Color) then
+                if (color == trinket.Color) then
+                    return trinket;
+                end;
+            else
+                return trinket;
+            end;
+        end;
+
+        if (trinket.MeshType == 'Sphere') then
+            if (mesh.MeshType == Enum.MeshType.Sphere and vertexColor == trinket.VertexColor) then
+                return trinket;
+            end;
+        end;
+    end;
+
+    return nil;
+end;
+
+
+do -- // ESP Functions
+    function functions.onNewTrinketAdded(trinketModel, espConstructor)
+        if (not IsA(trinketModel, 'Model')) then
+            return;
+        end;
+
+        local handle = FindFirstChild(trinketModel, 'Handle');
+        if (not handle) then
+            return;
+        end;
+
+        local trinketData = resolveTrinket(handle);
+        if (not trinketData) then
+            return;
+        end;
+
+        local espObj = espConstructor.new(trinketModel, trinketData.Name);
+
+        local connection;
+        connection = trinketModel:GetPropertyChangedSignal('Parent'):Connect(function()
+            if (not trinketModel.Parent) then
+                espObj:Destroy();
+                connection:Disconnect();
+            end;
+        end);
+    end;
+
+    function functions.onNewBagAdded()
+
+    end;
+
+    function functions.onNewNpcAdded(npc, espConstructor)
+        local npcObj;
+
+        if (IsA(npc, 'Model') and not FindFirstChild(npc, 'PurchaseInfo')) then
+            npcObj = espConstructor.new(npc, npc.Name);
+        else
+            local code = [[
+                local npc = ...;
+                return setmetatable({}, {
+                    __index = function(_, p)
+                        if (p == 'Position') then
+                            return npc.PrimaryPart and npc.PrimaryPart.Position or npc.WorldPivot.Position
+                        end;
+                    end,
+                });
+            ]]
+
+            npcObj = espConstructor.new({code = code, vars = {npc}}, npc.Name);
+        end;
+
+        local connection;
+        connection = npc:GetPropertyChangedSignal('Parent'):Connect(function()
+            if (not npc.Parent) then
+                npcObj:Destroy();
+                connection:Disconnect();
+            end;
+        end);
+    end;
+end;
+
+do -- // ESP Section
+    makeESP({
+        sectionName = 'Trinkets',
+        type = 'childAdded',
+        args = workspace.TrinketSpawn,
+        callback = functions.onNewTrinketAdded
+    });
+
+    makeESP({
+        sectionName = 'Bags',
+        type = 'childAdded',
+        args = workspace.Thrown,
+        callback = functions.onNewBagAdded
+    });
+
+    makeESP({
+        sectionName = 'Npcs',
+        type = 'childAdded',
+        args = workspace.NPCs,
+        callback = functions.onNewNpcAdded
+    });
 end;
