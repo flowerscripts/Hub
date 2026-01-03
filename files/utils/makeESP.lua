@@ -87,6 +87,7 @@ local toCamelCase = sharedRequire('utils/toCamelCase.lua');
 			local onStateChanged = enableToggle.onStateChanged;
 
 			onStateChanged:Connect(function(state)
+				print('visible');
 				showDistance.main.Visible = state;
 			end);
 
