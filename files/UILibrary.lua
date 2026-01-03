@@ -625,14 +625,13 @@ do -- // Load
 			end
 
 			option.onStateChanged:Fire(state);
+			
 			library.OnFlagChanged:Fire({
 				flag = self.flag,
 				text = self.text,
 				value = self.value,
 				state = self.state
 			});
-
-			print('OnFlagChanged fired with flag:', self.flag, 'state:', self.state)
 		end
 
 		task.defer(function()
