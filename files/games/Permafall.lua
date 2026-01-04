@@ -1074,10 +1074,76 @@ end;
 
 do -- // Player Classes
     playerClassesList = {
+        -- // Chaotic Classes
+
         ['Brawler'] = {
             ['Active'] = {'Body Grinder', 'Bruising Drop', 'Rib Crusher', 'Swift Kick'};
+        },
+       
+        ['Greatsword'] = {
+            ['Active'] = {'Heart Thrust', 'Earth Shaker', 'Rising Cyclone'};
+        },
+
+        ['Assassin'] = {
+            ['Active'] = {'Death Bound', 'Raijin', 'Toxic Slice', 'True Trickery'};
+        },
+
+        ['Ronin'] = {
+            ['Active'] = {'Ruinous Burst', 'Favour from fang', 'Sly Shadow', 'Deep Slash'};
+        },
+
+        ['Bladesman'] = {
+            ['Active'] = {'Twin Slashes', 'Deadly Cascade', 'Deep Slash'};
+        },
+
+        ['Wraith'] = {
+            ['Active'] = {'Impulsing Staff', 'Midway Strike', 'Enchain', 'Rebound Haul', 'Destined Impact'};
+            ['Passive'] = {'Chain Link'};
+        },
+
+        -- // Orderly Classes
+
+        ['Monk'] = {
+            ['Active'] = {'Spirit Palm', 'Loop Kicks', 'Ankle Breaker', 'Kickoff Leap'};
+        },
+
+        ['Lumen'] = {
+            ['Active'] = {'Protege Solum', 'Sagitta Lucem', 'Laqueus Lucis'};
+            ['Passive'] = {'Mage Training'};
+        },
+
+         ['Piandao'] = {
+            ['Active'] = {'Blink', 'Lightning Slash', 'AfterImage'};
         }
-    }
+     }
+
+     function functions.getPlayerClass(player)
+        if (not player) then return 'Freshie' end;
+        local Backpack = player.Backpack;
+        local classCounts = {};
+        
+        for className, classData in pairs(playerClassesList) do
+            classCounts[className] = 0;
+            
+            for _, activeName in ipairs(classData.Active) do
+                if (Backpack:FindFirstChild(activeName)) then
+                    classCounts[className] = classCounts[className] + 1;
+                end;
+            end;
+        end;
+        
+        local bestClass = 'Freshie';
+        local highestCount = 0;
+        
+        for className, count in pairs(classCounts) do
+            if (count > highestCount) then
+                highestCount = count;
+                bestClass = className;
+            end;
+        end;
+        
+        return highestCount > 0 and bestClass or 'Freshie';
+     end;
 end;
 
 
@@ -1087,7 +1153,8 @@ do -- // ESP Functions
         local classText = '';
 
         if (library.flags.showClass) then
-            classText = ' [Freshie]';
+            local playerClass = functions.getPlayerClass(self._player);
+            classText = ' [' .. playerClass .. ']';
         end;
 
         return {
@@ -1104,28 +1171,33 @@ do -- // ESP Functions
 
     end;
 
-    local npcToggles = {}
-
     function functions.onNewNpcAdded(npc, espConstructor)
-        if not npc:IsA("Model") then return end
+        local npcObj;
+        if (npc:IsA('BasePart') or npc:IsA('MeshPart')) then
+            npcObj = espConstructor.new(npc, npc.Name);
+        else
+            local code = [[
+                    local npc = ...;
+                    return setmetatable({}, {
+                        __index = function(_, p)
+                            if (p == 'Position') then
+                                return npc.PrimaryPart and npc.PrimaryPart.Position or npc.WorldPivot.Position
+                            end;
+                        end,
+                    });
+                ]]
 
-        task.spawn(function()
-            local root = npc:WaitForChild("Head", 10) or npc:WaitForChild("HumanoidRootPart", 10) or npc.PrimaryPart
-            
-            if not root then return end
+            npcObj = espConstructor.new({code = code, vars = {npc}}, npc.Name);
+        end;
 
-            -- Change #2 (tag) to 'NPC' instead of npc.Name.
-            -- This forces all NPCs to use the flag: library.flags.showNpc
-            local espObject = espConstructor.new(root, 'NPC', nil, false)
-
-            -- We manually override the display text so it still shows the NPC's actual name
-            espObject._text = npc.Name
-
-            npc.Destroying:Connect(function()
-                espObject:Destroy()
-            end)
-        end)
-    end
+        local connection;
+        connection = npc:GetPropertyChangedSignal('Parent'):Connect(function()
+            if (not npc.Parent) then
+                npcObj:Destroy();
+                connection:Disconnect();
+            end;
+        end);
+    end;
 end;
 
 
@@ -1154,19 +1226,6 @@ do -- // ESP Section
             type = 'childAdded',
             args = workspace.NPCs,
             callback = functions.onNewNpcAdded,
-
-            onLoaded = function(section)
-                -- This adds the single toggle that all NPCs created above will check
-                section:AddToggle({
-                    text = 'Show All NPCs',
-                    flag = 'showNpc' 
-                })
-
-                -- Return an empty list so the utility doesn't try to manage sub-toggles
-                return {
-                    list = {}
-                }
-            end
-        })
+        });
 	end;
 end;
