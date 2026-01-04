@@ -1108,63 +1108,33 @@ Trinkets = {
 }
 end;
 
-local function normalizeId(id)
-    return tostring(id):gsub('%D', '');
-end;
-
-local function getHandleMeshInfo(handle)
-    local mesh = FindFirstChild(handle, 'Mesh');
-    if (not mesh) then return nil; end;
-
-    return {
-        MeshId = mesh.MeshId;
-        MeshType = mesh.MeshType.Name;
-    };
-end;
-
-local function getDominantColor(c)
-    if c.R > c.G and c.R > c.B then return "Red" end
-    if c.G > c.R and c.G > c.B then return "Green" end
-    if c.B > c.R and c.B > c.G then return "Blue" end
-    return "White"
-end
-
 local function resolveTrinketFromHandle(handle)
     if not handle then return nil end
-    local mesh = handle:FindFirstChildWhichIsA("SpecialMesh") or handle:FindFirstChild("Mesh")
+    local mesh = handle:FindFirstChild("Mesh") or handle:FindFirstChildWhichIsA("SpecialMesh")
     if not mesh then return nil end
 
-    local hId = normalizeId(mesh.MeshId)
-    local hType = mesh.MeshType.Name
+    local hId = tostring(mesh.MeshId):gsub('%D', '')
     local hColor = handle.Color
 
     for _, trinket in ipairs(Trinkets) do
-        local isMatch = false
-        if trinket.MeshId and hId ~= "" then
-            if normalizeId(trinket.MeshId) == hId then
-                isMatch = true
-            end
-        elseif trinket.MeshType and trinket.MeshType == hType then
-            isMatch = true
-        end
+        -- Check MeshId match (normalized to remove spaces/%20)
+        local isMeshMatch = trinket.MeshId and (tostring(trinket.MeshId):gsub('%D', '') == hId)
+        -- Check MeshType match (for Opal)
+        local isTypeMatch = trinket.MeshType and (trinket.MeshType == mesh.MeshType.Name)
 
-        if isMatch then
-            -- Requirement: Color3
+        if isMeshMatch or isTypeMatch then
+            -- If it has a color requirement, it MUST match exactly (per your test)
             if trinket.Color then
-                if colorsMatch(hColor, trinket.Color) then
+                if hColor == trinket.Color then
                     return trinket
-                else
-                    -- This will tell us exactly what the color mismatch is
-                    -- print("Color Mismatch for " .. trinket.Name .. " | Game: " .. tostring(hColor) .. " | Table: " .. tostring(trinket.Color))
                 end
-            -- Requirement: VertexColor
             elseif trinket.VertexColor then
                 local vColor = Color3.new(trinket.VertexColor.X, trinket.VertexColor.Y, trinket.VertexColor.Z)
-                if colorsMatch(hColor, vColor) then
+                if hColor == vColor then
                     return trinket
                 end
             else
-                -- No color requirement (Goblet/Scroll)
+                -- No color requirement (Goblet/Scroll), return immediately
                 return trinket
             end
         end
