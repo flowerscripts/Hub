@@ -10,14 +10,15 @@ local function makeEsp(options)
 
 	local tag = toCamelCase(options.sectionName);
 
-	if (library.flags[options.sectionName] == nil) then
-        library.flags[options.sectionName] = false;
-    end;
-
 	assert(options.sectionName, 'options.sectionName is required');
 	assert(options.callback, 'options.callback is required');
 	assert(options.args, 'options.args is required');
 	assert(options.type, 'options.type is required');
+
+	
+	if (library.flags[options.sectionName] == nil) then
+        library.flags[options.sectionName] = false;
+    end;
 
 	sectionIndex = (sectionIndex % 2) + 1;
 
@@ -37,6 +38,14 @@ local function makeEsp(options)
 		text = 'Enable',
 		flag = options.sectionName
 	});
+
+	if (library.OnFlagChanged) then
+        library.OnFlagChanged:Fire({
+            type = 'toggle',
+            flag = options.sectionName,
+            state = library.flags[options.sectionName]
+        });
+    end;
 
 	print('Created ESP with flag:', options.sectionName, 'camelCase tag:', tag);
 	print('Flag state:', library.flags[options.sectionName]);
