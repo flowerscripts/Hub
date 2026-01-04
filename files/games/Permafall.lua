@@ -1007,71 +1007,6 @@ local areaNames = {
     'Tavern';
 }
 
--- // Trinket Data :: Name -> MeshId
--- // ------- If Trinket has same MeshId we then check the Handle Color to determine which one it is.
--- // workspace.TrinketSpawn.SPAWN.Handle.Mesh (Handle is where the UI will be placed and Mesh is how we determine which Trinket it is.)
-
-do -- // Set Trinket Data
-    Trinkets = {
-        {
-            ['MeshId'] = 'rbxassetid://13116112';
-            ['Name'] = 'Goblet';
-        },
-
-        {
-            ['MeshId'] = 'rbxassetid://2877143560';
-            ['Name'] = 'Amethyst';
-            ['Color'] = Color3.fromRGB(167, 95, 209);
-        },
-
-        {
-            ['MeshId'] = 'rbxassetid://2877143560';
-            ['Name'] = 'Diamond';
-            ['Color'] = Color3.fromRGB(248, 248, 248);
-        },
-
-        {
-            ['MeshId'] = 'rbxassetid://2877143560';
-            ['Name'] = 'Sapphire';
-            ['Color'] = Color3.fromRGB(0, 0, 255);
-        },
-
-        {
-            ['MeshId'] = 'rbxassetid://2877143560';
-            ['Name'] = 'Pure Diamond';
-            ['Color'] = Color3.fromRGB(18, 238, 212);
-        },
-
-        {
-            ['MeshId'] = 'rbxassetid://2877143560';
-            ['Name'] = 'Ruby';
-            ['Color'] = Color3.fromRGB(255, 0, 0);
-        },
-
-        {
-            ['MeshId'] = 'rbxassetid://2877143560';
-            ['Name'] = 'Emerald';
-            ['Color'] = Color3.fromRGB(31, 128, 29);
-        },
-
-        {
-            ['Name'] = 'Opal';
-            ['MeshType'] = 'Sphere';
-            ['VertexColor'] = Vector3.new(1, 1, 1);
-        },
-
-        {
-            ['Name'] = 'Scroll';
-            ['MeshId'] = 'rbxassetid://60791940';
-        },
-
-        {
-            ['Name'] = 'Ring';
-            ['MeshId'] = 'rbxassetid://2637545558';
-        },
-    };
-end;
-
 do -- // Player Classes
     playerClassesList = {
         -- // Chaotic Classes
@@ -1146,6 +1081,72 @@ do -- // Player Classes
      end;
 end;
 
+
+-- // Trinket Data :: Name -> MeshId
+-- // ------- If Trinket has same MeshId we then check the Handle Color to determine which one it is.
+-- // workspace.TrinketSpawn.SPAWN.Handle.Mesh (Handle is where the UI will be placed and Mesh is how we determine which Trinket it is.)
+
+do -- // Set Trinket Data
+    Trinkets = {
+        {
+            ['MeshId'] = 'rbxassetid://13116112';
+            ['Name'] = 'Goblet';
+        },
+
+        {
+            ['MeshId'] = 'rbxassetid://2877143560';
+            ['Name'] = 'Amethyst';
+            ['Color'] = Color3.fromRGB(167, 95, 209);
+        },
+
+        {
+            ['MeshId'] = 'rbxassetid://2877143560';
+            ['Name'] = 'Diamond';
+            ['Color'] = Color3.fromRGB(248, 248, 248);
+        },
+
+        {
+            ['MeshId'] = 'rbxassetid://2877143560';
+            ['Name'] = 'Sapphire';
+            ['Color'] = Color3.fromRGB(0, 0, 255);
+        },
+
+        {
+            ['MeshId'] = 'rbxassetid://2877143560';
+            ['Name'] = 'Pure Diamond';
+            ['Color'] = Color3.fromRGB(18, 238, 212);
+        },
+
+        {
+            ['MeshId'] = 'rbxassetid://2877143560';
+            ['Name'] = 'Ruby';
+            ['Color'] = Color3.fromRGB(255, 0, 0);
+        },
+
+        {
+            ['MeshId'] = 'rbxassetid://2877143560';
+            ['Name'] = 'Emerald';
+            ['Color'] = Color3.fromRGB(31, 128, 29);
+        },
+
+        {
+            ['Name'] = 'Opal';
+            ['MeshType'] = 'Sphere';
+            ['VertexColor'] = Vector3.new(1, 1, 1);
+        },
+
+        {
+            ['Name'] = 'Scroll';
+            ['MeshId'] = 'rbxassetid://60791940';
+        },
+
+        {
+            ['Name'] = 'Ring';
+            ['MeshId'] = 'rbxassetid://2637545558';
+        },
+    };
+end;
+
 local function normalizeId(id)
     return tostring(id):gsub('%D', '');
 end;
@@ -1160,71 +1161,45 @@ local function getHandleMeshInfo(handle)
     };
 end;
 
+local function colorsEqual(a, b)
+    return math.abs(a.R - b.R) < 0.01
+       and math.abs(a.G - b.G) < 0.01
+       and math.abs(a.B - b.B) < 0.01;
+end;
+
+
 local function resolveTrinketFromHandle(handle)
-    if (not handle or not IsA(handle, 'BasePart')) then
+    if (not handle or not handle:IsA('BasePart')) then
         return nil;
     end;
 
-    local meshInfo = getHandleMeshInfo(handle);
-    if (not meshInfo) then
+    local mesh = handle:FindFirstChildWhichIsA('SpecialMesh');
+    if (not mesh) then
         return nil;
     end;
 
+    local meshId = normalizeId(mesh.MeshId);
     local handleColor = handle.Color;
 
-    -- First loop: MeshType matching
-    for _, trinket in ipairs(Trinkets) do
-        if (trinket.MeshType) then
-            if (trinket.MeshType == meshInfo.MeshType) then
-                if (trinket.Color) then
-                    if (handleColor == trinket.Color) then
-                        return trinket;
-                    end;
-                elseif (trinket.VertexColor) then
-                    local trinketColor = Color3.new(trinket.VertexColor.X, trinket.VertexColor.Y, trinket.VertexColor.Z);
-                    if (handleColor == trinketColor) then
-                        return trinket;
-                    end;
-                else
-                    return trinket;  -- No color requirement, return immediately
-                end;
-            end;
-        end;
-    end;
+    local fallback;
 
-    -- Second loop: MeshId matching
+    print('Handle Color:', handleColor);
+
     for _, trinket in ipairs(Trinkets) do
-        if (trinket.MeshId) then
-            if (normalizeId(trinket.MeshId) == normalizeId(meshInfo.MeshId)) then
-                print('  -> MeshId MATCH for:', trinket.Name)
-                if (trinket.Color) then
-                    print('  -> Has Color, checking match')
-                    if (handleColor == trinket.Color) then
-                        print('  -> COLOR MATCH! Returning:', trinket.Name)
-                        return trinket;
-                    else
-                        print('  -> Color mismatch, continuing')
-                    end;
-                elseif (trinket.VertexColor) then
-                    print('  -> Has VertexColor, checking match')
-                    local trinketColor = Color3.new(trinket.VertexColor.X, trinket.VertexColor.Y, trinket.VertexColor.Z);
-                    if (handleColor == trinketColor) then
-                        print('  -> VERTEXCOLOR MATCH! Returning:', trinket.Name)
-                        return trinket;
-                    else
-                        print('  -> VertexColor mismatch, continuing')
-                    end;
-                else
-                    print('  -> No color requirement! Returning:', trinket.Name)
+        if (trinket.MeshId and normalizeId(trinket.MeshId) == meshId) then
+            if (trinket.Color) then
+                if (colorsEqual(handleColor, trinket.Color)) then
                     return trinket;
                 end;
+            else
+                fallback = trinket;
             end;
         end;
     end;
 
-    print('Reached end of function, returning nil')
-    return nil;
+    return fallback;
 end;
+
 
 
 do -- // ESP Functions
