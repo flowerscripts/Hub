@@ -1233,11 +1233,6 @@ do -- // ESP Section
             callback = functions.onNewNpcAdded,
             
             onLoaded = function(section)
-                section:AddToggle({
-                    text = 'Show Health',
-                    flag = 'Npcs Show Health'
-                });
-                
                 local npcToggles = {};
                 
                 local uniqueNpcs = {};
