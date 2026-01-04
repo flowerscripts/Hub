@@ -1173,11 +1173,15 @@ do -- // ESP Functions
 
     function functions.onNewNpcAdded(npc, espConstructor)
         local npcName = npc.Name;
-        local showFlag = toCamelCase('Show ' .. npcName);
+        
+        local tagData = {
+            displayName = npcName,
+            tag = toCamelCase('Show ' .. npcName)
+        };
         
         local npcObj;
         if (npc:IsA('BasePart') or npc:IsA('MeshPart')) then
-            npcObj = espConstructor.new(npc, npcName);
+            npcObj = espConstructor.new(npc, tagData);
         else
             local code = [[
                 local npc = ...;
@@ -1190,10 +1194,8 @@ do -- // ESP Functions
                 });
             ]]
 
-            npcObj = espConstructor.new({code = code, vars = {npc}}, npcName);
+            npcObj = espConstructor.new({code = code, vars = {npc}}, tagData);
         end;
-        
-        npcObj._showFlag = showFlag;
 
         local connection;
         connection = npc:GetPropertyChangedSignal('Parent'):Connect(function()
