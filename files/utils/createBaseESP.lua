@@ -204,37 +204,15 @@ local library = sharedRequire('UILibrary.lua');
 				end;
 			end;
 
-			local packet = {
-				_id = self._id,
-				_tag = self._tag,
-				_text = self._text,
-				_instance = instance,
-				_color = self._color,
-				_isLazy = self._isLazy,
-				
-				-- These are the flag strings the parallel actor uses to look up values in its local 'flags' table
-				_showFlag = self._showFlag,
-				_maxDistanceFlag = self._maxDistanceFlag,
-				_showHealthFlag = self._showHealthFlag,
-				_colorFlag = self._colorFlag,
-				_colorFlag2 = self._colorFlag2,
-				_showDistanceFlag = self._showDistanceFlag,
-			};
-
-			-- Adding custom instance data if applicable
-			if (isCustomInstance) then
-				packet._code = instance.code;
-				packet._vars = instance.vars;
-			end;
-
-			-- Fire the sanitized packet
+			local smallData = table.clone(self);
+			smallData._actor = nil;
 			self._actor.commEvent:Fire({
 				updateType = 'new',
-				data = packet,
+				data = smallData,
 				isCustomInstance = isCustomInstance,
-				showFlag = showESPFlag -- This matches the 'Enable' toggle flag
+				showFlag = showESPFlag
 			});
-			
+
 			return self;
 		end;
 
