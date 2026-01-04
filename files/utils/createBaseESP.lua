@@ -216,12 +216,8 @@ local library = sharedRequire('UILibrary.lua');
 			});	
 			
 			local isEnabled = library.flags[self._showFlag]
-			
-			print(string.format("ID: %s | Flag: %s | Enabled: %s | Visible: %s", 
-				tostring(self._id), 
-				tostring(self._showFlag), 
-				tostring(isEnabled), 
-			))
+
+			print(string.format("ID: %s | Flag: %s | Enabled: %s | Visible: %s", tostring(self._id), tostring(self._showFlag), tostring(isEnabled)))
 
 			return self;
 		end;
