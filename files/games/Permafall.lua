@@ -1146,6 +1146,85 @@ do -- // Player Classes
      end;
 end;
 
+local function normalizeId(id)
+    return tostring(id):gsub('%D', '');
+end;
+
+local function getHandleMeshInfo(handle)
+    local mesh = FindFirstChild(handle, 'Mesh');
+    if (not mesh) then return nil; end;
+
+    return {
+        MeshId = mesh.MeshId;
+        MeshType = mesh.MeshType.Name;
+    };
+end;
+
+local function resolveTrinketFromHandle(handle)
+    if (not handle or not IsA(handle, 'BasePart')) then
+        return nil;
+    end;
+
+    local meshInfo = getHandleMeshInfo(handle);
+    if (not meshInfo) then
+        return nil;
+    end;
+
+    local handleColor = handle.Color;
+
+    -- First loop: MeshType matching
+    for _, trinket in ipairs(Trinkets) do
+        if (trinket.MeshType) then
+            if (trinket.MeshType == meshInfo.MeshType) then
+                if (trinket.Color) then
+                    if (handleColor == trinket.Color) then
+                        return trinket;
+                    end;
+                elseif (trinket.VertexColor) then
+                    local trinketColor = Color3.new(trinket.VertexColor.X, trinket.VertexColor.Y, trinket.VertexColor.Z);
+                    if (handleColor == trinketColor) then
+                        return trinket;
+                    end;
+                else
+                    return trinket;  -- No color requirement, return immediately
+                end;
+            end;
+        end;
+    end;
+
+    -- Second loop: MeshId matching
+    for _, trinket in ipairs(Trinkets) do
+        if (trinket.MeshId) then
+            if (normalizeId(trinket.MeshId) == normalizeId(meshInfo.MeshId)) then
+                print('  -> MeshId MATCH for:', trinket.Name)
+                if (trinket.Color) then
+                    print('  -> Has Color, checking match')
+                    if (handleColor == trinket.Color) then
+                        print('  -> COLOR MATCH! Returning:', trinket.Name)
+                        return trinket;
+                    else
+                        print('  -> Color mismatch, continuing')
+                    end;
+                elseif (trinket.VertexColor) then
+                    print('  -> Has VertexColor, checking match')
+                    local trinketColor = Color3.new(trinket.VertexColor.X, trinket.VertexColor.Y, trinket.VertexColor.Z);
+                    if (handleColor == trinketColor) then
+                        print('  -> VERTEXCOLOR MATCH! Returning:', trinket.Name)
+                        return trinket;
+                    else
+                        print('  -> VertexColor mismatch, continuing')
+                    end;
+                else
+                    print('  -> No color requirement! Returning:', trinket.Name)
+                    return trinket;
+                end;
+            end;
+        end;
+    end;
+
+    print('Reached end of function, returning nil')
+    return nil;
+end;
 
 
 do -- // ESP Functions
@@ -1163,8 +1242,35 @@ do -- // ESP Functions
         };
     end;
 
-    function functions.onNewTrinketAdded(descendant, espConstructor)
-       
+    function functions.onNewTrinketAdded(spawnPart, espConstructor)
+        if (spawnPart.Name ~= 'SPAWN') then return end;
+
+        local Handle = FindFirstChild(spawnPart, 'Handle');
+        if (not Handle) then return end;
+
+        local trinketData = resolveTrinketFromHandle(Handle);
+        if (not trinketData) then return end;
+
+        local code = [[
+            local Handle = ...;
+            return setmetatable({}, {
+                __index = function(_, p)
+                    if (p == 'Position') then
+                        return Handle.Position;
+                    end;
+                end,
+            });
+        ]];
+
+        local espObj = espConstructor.new({ code = code, vars = { Handle } }, trinketData.Name);
+
+        local connection;
+        connection = spawnPart:GetPropertyChangedSignal('Parent'):Connect(function()
+            if (not spawnPart.Parent) then
+                espObj:Destroy();
+                connection:Disconnect();
+            end;
+        end);
     end;
 
     function functions.onDroppedItemAdded()
@@ -1173,12 +1279,8 @@ do -- // ESP Functions
 
     function functions.onNewNpcAdded(npc, espConstructor)
         local npcName = npc.Name;
-        local flagName = string.format('Show %s', npcName);
-
-        if (not library.flags[flagName]) then
-            return;
-        end;
-
+        local showFlag = toCamelCase('Show ' .. npcName);
+        
         local npcObj;
         if (npc:IsA('BasePart') or npc:IsA('MeshPart')) then
             npcObj = espConstructor.new(npc, npcName);
@@ -1188,14 +1290,16 @@ do -- // ESP Functions
                 return setmetatable({}, {
                     __index = function(_, p)
                         if (p == 'Position') then
-                            return npc.PrimaryPart and npc.PrimaryPart.Position or npc.WorldPivot.Position;
+                            return npc.PrimaryPart and npc.PrimaryPart.Position or npc.WorldPivot.Position
                         end;
                     end,
                 });
-            ]];
+            ]]
 
             npcObj = espConstructor.new({code = code, vars = {npc}}, npcName);
         end;
+        
+        npcObj._showFlag = showFlag;
 
         local connection;
         connection = npc:GetPropertyChangedSignal('Parent'):Connect(function()
@@ -1233,31 +1337,6 @@ do -- // ESP Section
             type = 'childAdded',
             args = workspace.NPCs,
             callback = functions.onNewNpcAdded,
-            
-            onLoaded = function(section)
-                local npcToggles = {};
-
-                local uniqueNpcs = {};
-                for _, npc in pairs(workspace.NPCs:GetChildren()) do
-                    if (not table.find(uniqueNpcs, npc.Name)) then
-                        table.insert(uniqueNpcs, npc.Name);
-                    end;
-                end;
-
-                table.sort(uniqueNpcs);
-
-                for _, npcName in ipairs(uniqueNpcs) do
-                    local toggle = section:AddToggle({
-                        text = npcName,
-                        flag = string.format('Show %s', npcName),
-                        state = true,
-                    });
-
-                    table.insert(npcToggles, toggle);
-                end;
-
-            return {list = npcToggles};
-          end;
         });
 	end;
 end;
