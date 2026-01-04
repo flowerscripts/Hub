@@ -206,18 +206,13 @@ local library = sharedRequire('UILibrary.lua');
 
 			local smallData = table.clone(self);
 			smallData._actor = nil;
-			smallData._maid = nil;
-
 			self._actor.commEvent:Fire({
 				updateType = 'new',
 				data = smallData,
 				isCustomInstance = isCustomInstance,
 				showFlag = showESPFlag
-			});	
-			
-			local isEnabled = library.flags[self._showFlag]
+			});
 
-			print(string.format("ID: %s | Flag: %s | Enabled: %s", tostring(self._id), tostring(self._showFlag), tostring(isEnabled)))
 
 			return self;
 		end;
