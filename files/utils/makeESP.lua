@@ -15,11 +15,6 @@ local function makeEsp(options)
 	assert(options.args, 'options.args is required');
 	assert(options.type, 'options.type is required');
 
-	
-	if (library.flags[options.sectionName] == nil) then
-        library.flags[options.sectionName] = false;
-    end;
-
 	sectionIndex = (sectionIndex % 2) + 1;
 
 	local espSections = Utility:getESPSection();
@@ -39,22 +34,13 @@ local function makeEsp(options)
 		flag = options.sectionName
 	});
 
-	if (library.OnFlagChanged) then
-        library.OnFlagChanged:Fire({
-            type = 'toggle',
-            flag = options.sectionName,
-            state = library.flags[options.sectionName]
-        });
-    end;
-
-	print('Created ESP with flag:', options.sectionName, 'camelCase tag:', tag);
-	print('Flag state:', library.flags[options.sectionName]);
+	-- Wait for the toggle's task.defer to complete so the flag is initialized
+	task.wait();
 
 	local showDistance = espSection:AddToggle({
 		text = 'Show Distance',
 		flag = options.sectionName .. ' Show Distance'
 	})
-
 
 	if (not options.noColorPicker) then
 		enableToggle:AddColor({
