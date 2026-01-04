@@ -140,30 +140,71 @@ local library = sharedRequire('UILibrary.lua');
 		local BaseEsp = {};
 
 		BaseEsp.ClassName = 'BaseEsp';
-		BaseEsp.Flag = flag; -- This is the Section Name (e.g., 'Npcs')
+		BaseEsp.Flag = flag;
 		BaseEsp.Container = container;
 		BaseEsp.__index = BaseEsp;
 
-		local whiteColor = Color3.new(1, 1, 1);
-		local maxDistanceFlag = BaseEsp.Flag .. ' Max Distance'; -- Matches makeEsp slider
-		local showHealthFlag = BaseEsp.Flag .. ' Show Health';
-		local showESPFlag = BaseEsp.Flag; -- The "Enable" toggle
+		local whiteColor = container.color or Color3.new(1, 1, 1);
+		
+
+		local maxDistanceFlag = BaseEsp.Flag .. 'MaxDistance';
+		local showHealthFlag = BaseEsp.Flag .. 'ShowHealth';
+		local showESPFlag = BaseEsp.Flag;
 
 		function BaseEsp.new(instance, tag, color, isLazy)
 			assert(instance, '#1 instance expected');
 			assert(tag, '#2 tag expected');
 
+			local isCustomInstance = false;
+
+			if (typeof(instance) == 'table' and rawget(instance, 'code')) then
+				isCustomInstance = true;
+			end;
+
+			color = color or whiteColor;
+
 			local self = setmetatable({}, BaseEsp);
-			
-			-- Identify the actor for this object
-			local actorIndex = (count % readyCount) + 1;
-			self._actor = actors[actorIndex];
+			self._tag = tag;
+
+			local displayName = tag;
+
+			if (typeof(tag) == 'table') then
+				displayName = tag.displayName;
+				self._tag = tag.tag;
+			end;
+
+			self._instance = instance;
+			self._text = displayName;
+			self._color = color;
+			self._showFlag = toCamelCase('Show ' .. self._tag);
+			self._colorFlag = toCamelCase(self._tag .. ' Color');
+			self._colorFlag2 = BaseEsp.Flag .. 'Color';
+			self._showDistanceFlag = BaseEsp.Flag .. 'ShowDistance';
+			self._isLazy = isLazy;
+			self._actor = actors[(count % readyCount) + 1];
 			self._id = count;
+			self._maid = Maid.new();
+
 			count += 1;
 
-			-- Prepare the data packet for the Parallel Actor
-			-- Your parallel script expects these specific keys in 'data.data'
-			local packet = {
+			if (isLazy and not isCustomInstance) then
+				self._instancePosition = instance.Position;
+			end;
+
+			self._maxDistanceFlag = maxDistanceFlag;
+			self._showHealthFlag = showHealthFlag;
+
+			if (isCustomInstance) then
+				self._isCustomInstance = true;
+				self._code = instance.code;
+				self._vars = instance.vars;
+
+			if (instance.color and typeof(instance.color) == 'Color3') then
+					self._color = instance.color;
+				end;
+			end;
+
+		local packet = {
 				_id = self._id,
 				_tag = typeof(tag) == 'table' and tag.tag or tag,
 				_text = typeof(tag) == 'table' and tag.displayName or tag,
@@ -171,30 +212,23 @@ local library = sharedRequire('UILibrary.lua');
 				_color = color or whiteColor,
 				_isLazy = isLazy,
 				_showFlag = toCamelCase('Show ' .. (typeof(tag) == 'table' and tag.tag or tag)),
-				_maxDistanceFlag = maxDistanceFlag,
-				_showHealthFlag = showHealthFlag,
+				_maxDistanceFlag = BaseEsp.Flag .. ' Max Distance',
+				_showHealthFlag = BaseEsp.Flag .. ' Show Health',
 				_colorFlag = toCamelCase((typeof(tag) == 'table' and tag.tag or tag) .. ' Color'),
 				_colorFlag2 = BaseEsp.Flag .. ' Color',
 				_showDistanceFlag = BaseEsp.Flag .. ' Show Distance',
-			};
+			}
 
-			-- Handle Custom Instances (for Voxl/Deepwoken style)
-			local isCustom = false;
-			if (typeof(instance) == 'table' and rawget(instance, 'code')) then
-				isCustom = true;
-				packet._code = instance.code;
-				packet._vars = instance.vars;
-			end;
-
-			-- FIRE TO ACTOR
+			-- IMPORTANT: Your Parallel script expects: { updateType = 'new', data = packet ... }
+			-- If using your Signal class, fire it like this:
 			self._actor.commEvent:Fire({
 				updateType = 'new',
 				data = packet,
-				showFlag = showESPFlag, -- This links to the 'Enable' toggle
-				isCustomInstance = isCustom
-			});
+				showFlag = BaseEsp.Flag, -- This MUST match the toggle flag in makeEsp
+				isCustomInstance = (typeof(instance) == 'table' and instance.code ~= nil)
+			})
 
-			self._maid = Maid.new();
+
 			return self;
 		end;
 
