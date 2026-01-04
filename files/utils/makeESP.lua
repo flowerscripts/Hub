@@ -3,130 +3,133 @@ local createBaseESP = sharedRequire('utils/createBaseESP.lua');
 local library = sharedRequire('UILibrary.lua');
 local toCamelCase = sharedRequire('utils/toCamelCase.lua');
 
-	local sectionIndex = 1;
-	local addedESPSearch = false;
-	local function makeEsp(options)
-		options = options or {};
+local sectionIndex = 1;
+local addedESPSearch = false;
+local function makeEsp(options)
+	options = options or {};
 
-		local tag = toCamelCase(options.sectionName);
+	local tag = toCamelCase(options.sectionName);
 
-		assert(options.sectionName, 'options.sectionName is required');
-		assert(options.callback, 'options.callback is required');
-		assert(options.args, 'options.args is required');
-		assert(options.type, 'options.type is required');
+	assert(options.sectionName, 'options.sectionName is required');
+	assert(options.callback, 'options.callback is required');
+	assert(options.args, 'options.args is required');
+	assert(options.type, 'options.type is required');
 
-		sectionIndex = (sectionIndex % 2) + 1;
+	sectionIndex = (sectionIndex % 2) + 1;
 
-		local espSections = Utility:getESPSection();
-		local espSection = espSections['column' .. sectionIndex]:AddSection(options.sectionName);
+	local espSections = Utility:getESPSection();
+	local espSection = espSections['column' .. sectionIndex]:AddSection(options.sectionName);
 
-		if (not addedESPSearch) then
-			addedESPSearch = true;
-			espSections.espSettings:AddBox({
-				text = 'ESP Search',
-				skipflag = true,
-				noload = true
-			});
-		end;
-
-		local enableToggle = espSection:AddToggle({
-			text = 'Enable',
-			flag = options.sectionName
+	if (not addedESPSearch) then
+		addedESPSearch = true;
+		espSections.espSettings:AddBox({
+			text = 'ESP Search',
+			skipflag = true,
+			noload = true
 		});
+	end;
 
-		local showDistance = espSection:AddToggle({
-			text = 'Show Distance',
-			flag = options.sectionName .. ' Show Distance'
-		})
+	local enableToggle = espSection:AddToggle({
+		text = 'Enable',
+		flag = options.sectionName
+	});
+
+	print('Created ESP with flag:', options.sectionName, 'camelCase tag:', tag);
+	print('Flag state:', library.flags[options.sectionName]);
+
+	local showDistance = espSection:AddToggle({
+		text = 'Show Distance',
+		flag = options.sectionName .. ' Show Distance'
+	})
 
 
-		if (not options.noColorPicker) then
-			enableToggle:AddColor({
-				flag = string.format('%s Color', options.sectionName)
-			});
-		end;
-
-
-		local DistanceSlider =  espSection:AddSlider({
-			text = 'Max Distance',
-			flag = options.sectionName .. ' Max Distance',
-			min = 100,
-			value = 100000,
-			max = 100000,
-			float = 100,
-			textpos = 2
+	if (not options.noColorPicker) then
+		enableToggle:AddColor({
+			flag = string.format('%s Color', options.sectionName)
 		});
+	end;
 
-		local espConstructor = createBaseESP(tag);
 
-		-- If arg is not a table turn arg into a table
-		options.args = typeof(options.args) == 'table' and options.args or {options.args};
+	local DistanceSlider =  espSection:AddSlider({
+		text = 'Max Distance',
+		flag = options.sectionName .. ' Max Distance',
+		min = 100,
+		value = 100000,
+		max = 100000,
+		float = 100,
+		textpos = 2
+	});
 
-		local descOrChild = options.type == 'childAdded' or options.type == 'descendantAdded';
-		local watcherFunc;
+	local espConstructor = createBaseESP(tag);
 
-		if (descOrChild) then
-			watcherFunc = Utility[options.type == 'childAdded' and 'listenToChildAdded' or 'listenToDescendantAdded'];
-		elseif (options.type == 'tagAdded') then
-			watcherFunc = Utility.listenToTagAdded;
-		end;
+	-- If arg is not a table turn arg into a table
+	options.args = typeof(options.args) == 'table' and options.args or {options.args};
 
-		if (not watcherFunc) then
-			return error(options.tag .. ' is not being watched!');
-		end;
+	local descOrChild = options.type == 'childAdded' or options.type == 'descendantAdded';
+	local watcherFunc;
 
-		for _, parent in next, options.args do
-			library.unloadMaid:GiveTask(watcherFunc(parent, function(obj)
-				options.callback(obj, espConstructor);
-			end));
-		end;
+	if (descOrChild) then
+		watcherFunc = Utility[options.type == 'childAdded' and 'listenToChildAdded' or 'listenToDescendantAdded'];
+	elseif (options.type == 'tagAdded') then
+		watcherFunc = Utility.listenToTagAdded;
+	end;
 
-		local loadedData = options.onLoaded and options.onLoaded(espSection);
+	if (not watcherFunc) then
+		return error(options.tag .. ' is not being watched!');
+	end;
 
-		library.OnLoad:Connect(function()
-			local onStateChanged = enableToggle.onStateChanged;
+	for _, parent in next, options.args do
+		library.unloadMaid:GiveTask(watcherFunc(parent, function(obj)
+			options.callback(obj, espConstructor);
+		end));
+	end;
 
-			onStateChanged:Connect(function(state)
-				showDistance.main.Visible = state;
-			end);
+	local loadedData = options.onLoaded and options.onLoaded(espSection);
 
-			if (not loadedData) then return; end;
+	library.OnLoad:Connect(function()
+		local onStateChanged = enableToggle.onStateChanged;
 
-			onStateChanged:Connect(function(state)
-				for _, listItem in next, loadedData.list do
-					listItem.main.Visible = state;
-				end;
-			end);
+		onStateChanged:Connect(function(state)
+			showDistance.main.Visible = state;
 		end);
-	end;
 
-		--[[
-			Example usage:
-		
-			local section = makeEsp({
-				sectionName = 'Mobs',
-		
-				type = 'childAdded',
-				args = {workspace},
-		
-				callback = function(obj, esp)
-					esp.new(obj, obj:GetAttribute('MobName') or mob.Name, nil, true); -- Simple args from createBaseESP
-				end,
-		
-				onLoaded = function(section)
-					section:AddToggle({
-						text = 'Show Health'
-					});
-		
-					-- You can also return a list for esp that require toggle for each obj
-					return {
-						list = arrayOfToggles
-					};
-				end
-			});
-		]]
+		if (not loadedData) then return; end;
 
-	-- This is required cause we want the script to finish loading before we setup esp
-	return function (options)
-		task.spawn(makeEsp, options);
-	end;
+		onStateChanged:Connect(function(state)
+			for _, listItem in next, loadedData.list do
+				listItem.main.Visible = state;
+			end;
+		end);
+	end);
+end;
+
+	--[[
+		Example usage:
+	
+		local section = makeEsp({
+			sectionName = 'Mobs',
+	
+			type = 'childAdded',
+			args = {workspace},
+	
+			callback = function(obj, esp)
+				esp.new(obj, obj:GetAttribute('MobName') or mob.Name, nil, true); -- Simple args from createBaseESP
+			end,
+	
+			onLoaded = function(section)
+				section:AddToggle({
+					text = 'Show Health'
+				});
+	
+				-- You can also return a list for esp that require toggle for each obj
+				return {
+					list = arrayOfToggles
+				};
+			end
+		});
+	]]
+
+-- This is required cause we want the script to finish loading before we setup esp
+return function (options)
+	task.spawn(makeEsp, options);
+end;
