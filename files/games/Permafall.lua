@@ -1173,7 +1173,12 @@ do -- // ESP Functions
 
     function functions.onNewNpcAdded(npc, espConstructor)
         local npcName = npc.Name;
-        
+        local flagName = string.format('Show %s', npcName);
+
+        if (not library.flags[flagName]) then
+            return;
+        end;
+
         local npcObj;
         if (npc:IsA('BasePart') or npc:IsA('MeshPart')) then
             npcObj = espConstructor.new(npc, npcName);
@@ -1183,15 +1188,15 @@ do -- // ESP Functions
                 return setmetatable({}, {
                     __index = function(_, p)
                         if (p == 'Position') then
-                            return npc.PrimaryPart and npc.PrimaryPart.Position or npc.WorldPivot.Position
+                            return npc.PrimaryPart and npc.PrimaryPart.Position or npc.WorldPivot.Position;
                         end;
                     end,
                 });
-            ]]
+            ]];
 
             npcObj = espConstructor.new({code = code, vars = {npc}}, npcName);
         end;
-        
+
         local connection;
         connection = npc:GetPropertyChangedSignal('Parent'):Connect(function()
             if (not npc.Parent) then
@@ -1229,32 +1234,30 @@ do -- // ESP Section
             args = workspace.NPCs,
             callback = functions.onNewNpcAdded,
             
-           onLoaded = function(section)
+            onLoaded = function(section)
                 local npcToggles = {};
-                
+
                 local uniqueNpcs = {};
                 for _, npc in pairs(workspace.NPCs:GetChildren()) do
-                    local npcName = npc.Name;
-                    if not table.find(uniqueNpcs, npcName) then
-                        table.insert(uniqueNpcs, npcName);
+                    if (not table.find(uniqueNpcs, npc.Name)) then
+                        table.insert(uniqueNpcs, npc.Name);
                     end;
                 end;
-                
+
                 table.sort(uniqueNpcs);
-                
+
                 for _, npcName in ipairs(uniqueNpcs) do
                     local toggle = section:AddToggle({
                         text = npcName,
-                        flag = 'show' .. npcName:gsub('^%l', string.upper),
+                        flag = string.format('Show %s', npcName),
                         state = true,
                     });
 
-                    print('Created toggle for NPC:', npcName, 'with flag:', toggle.flag);
-                    
                     table.insert(npcToggles, toggle);
                 end;
-                
-            return {list = npcToggles} end;
+
+            return {list = npcToggles};
+          end;
         });
 	end;
 end;
