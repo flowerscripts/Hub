@@ -127,7 +127,16 @@ local library = sharedRequire('UILibrary.lua');
 			end;
 		end);
 
-		loadstring(sharedRequire('utils/createBaseESPParallel.lua'))(commId);
+		local renderer = sharedRequire('utils/createBaseESPParallel.lua');
+		renderer(commEvent);
+
+		for flag, value in next, library.flags do
+			broadcastEvent:Fire({
+				flag = flag,
+				state = value,
+				type = 'toggle' -- match what the renderer expects
+			})
+		end
 
 		table.insert(actors, {commEvent = commEvent});
 		readyCount = 1;
@@ -206,6 +215,9 @@ local library = sharedRequire('UILibrary.lua');
 
 			local smallData = table.clone(self);
 			smallData._actor = nil;
+			
+			print(showESPFlag);
+
 			self._actor.commEvent:Fire({
 				updateType = 'new',
 				data = smallData,
