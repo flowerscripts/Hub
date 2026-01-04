@@ -1172,23 +1172,28 @@ do -- // ESP Functions
     end;
 
     function functions.onNewNpcAdded(npc, espConstructor)
+        local npcName = npc.Name;
+        local showFlag = toCamelCase('Show ' .. npcName);
+        
         local npcObj;
         if (npc:IsA('BasePart') or npc:IsA('MeshPart')) then
-            npcObj = espConstructor.new(npc, npc.Name);
+            npcObj = espConstructor.new(npc, npcName);
         else
             local code = [[
-                    local npc = ...;
-                    return setmetatable({}, {
-                        __index = function(_, p)
-                            if (p == 'Position') then
-                                return npc.PrimaryPart and npc.PrimaryPart.Position or npc.WorldPivot.Position
-                            end;
-                        end,
-                    });
-                ]]
+                local npc = ...;
+                return setmetatable({}, {
+                    __index = function(_, p)
+                        if (p == 'Position') then
+                            return npc.PrimaryPart and npc.PrimaryPart.Position or npc.WorldPivot.Position
+                        end;
+                    end,
+                });
+            ]]
 
-            npcObj = espConstructor.new({code = code, vars = {npc}}, npc.Name);
+            npcObj = espConstructor.new({code = code, vars = {npc}}, npcName);
         end;
+        
+        npcObj._showFlag = showFlag;
 
         local connection;
         connection = npc:GetPropertyChangedSignal('Parent'):Connect(function()
@@ -1226,6 +1231,39 @@ do -- // ESP Section
             type = 'childAdded',
             args = workspace.NPCs,
             callback = functions.onNewNpcAdded,
+            
+            onLoaded = function(section)
+                section:AddToggle({
+                    text = 'Show Health',
+                    flag = 'Npcs Show Health'
+                });
+                
+                local npcToggles = {};
+                
+                local uniqueNpcs = {};
+                for _, npc in pairs(workspace.NPCs:GetChildren()) do
+                    local npcName = npc.Name;
+                    if not table.find(uniqueNpcs, npcName) then
+                        table.insert(uniqueNpcs, npcName);
+                    end;
+                end;
+                
+                table.sort(uniqueNpcs);
+                
+                for _, npcName in ipairs(uniqueNpcs) do
+                    local toggle = section:AddToggle({
+                        text = 'Show ' .. npcName,
+                        flag = toCamelCase('Show ' .. npcName),
+                        state = true 
+                    });
+                    
+                    table.insert(npcToggles, toggle);
+                end;
+                
+                return {
+                    list = npcToggles
+                };
+            end
         });
 	end;
 end;
