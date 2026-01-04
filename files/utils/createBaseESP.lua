@@ -213,16 +213,19 @@ local library = sharedRequire('UILibrary.lua');
 				data = smallData,
 				isCustomInstance = isCustomInstance,
 				showFlag = showESPFlag
-			});
+			});	
+			
+			local isEnabled = flags[self._showFlag]
+			local instPos = self._instance.Position -- We know it's a Head now
 
-			local visibleState = library.flags[self._showFlag]; -- Looks for "showNpc"
-			print(visibleState);
-			print(self._showFlag);
-			if(visibleState == nil) then
-				visibleState = true;
-			elseif (not visibleState) then
-				return self:Unload();
-			end;
+			local _, visible = worldToViewportPoint(camera, instPos)
+
+			print(string.format("ID: %s | Flag: %s | Enabled: %s | Visible: %s", 
+				tostring(self._id), 
+				tostring(self._showFlag), 
+				tostring(isEnabled), 
+				tostring(visible)
+			))
 
 			return self;
 		end;
