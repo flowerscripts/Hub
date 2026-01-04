@@ -1087,64 +1087,25 @@ end;
 -- // workspace.TrinketSpawn.SPAWN.Handle.Mesh (Handle is where the UI will be placed and Mesh is how we determine which Trinket it is.)
 
 do -- // Set Trinket Data
-    Trinkets = {
-        {
-            ['MeshId'] = 'rbxassetid://13116112';
-            ['Name'] = 'Goblet';
-        },
+    -- Updated to strictly extract only the numbers from the string
+local function normalizeId(id)
+    if not id then return "" end
+    return tostring(id):gsub("%D", "") 
+end
 
-        {
-            ['MeshId'] = 'rbxassetid://2877143560';
-            ['Name'] = 'Amethyst';
-            ['Color'] = Color3.fromRGB(167, 95, 209);
-        },
-
-        {
-            ['MeshId'] = 'rbxassetid://2877143560';
-            ['Name'] = 'Diamond';
-            ['Color'] = Color3.fromRGB(248, 248, 248);
-        },
-
-        {
-            ['MeshId'] = 'rbxassetid://2877143560';
-            ['Name'] = 'Sapphire';
-            ['Color'] = Color3.fromRGB(0, 0, 255);
-        },
-
-        {
-            ['MeshId'] = 'rbxassetid://2877143560';
-            ['Name'] = 'Pure Diamond';
-            ['Color'] = Color3.fromRGB(18, 238, 212);
-        },
-
-        {
-            ['MeshId'] = 'rbxassetid://2877143560';
-            ['Name'] = 'Ruby';
-            ['Color'] = Color3.fromRGB(255, 0, 0);
-        },
-
-        {
-            ['MeshId'] = 'rbxassetid://2877143560';
-            ['Name'] = 'Emerald';
-            ['Color'] = Color3.fromRGB(31, 128, 29);
-        },
-
-        {
-            ['Name'] = 'Opal';
-            ['MeshType'] = 'Sphere';
-            ['VertexColor'] = Vector3.new(1, 1, 1);
-        },
-
-        {
-            ['Name'] = 'Scroll';
-            ['MeshId'] = 'rbxassetid://60791940';
-        },
-
-        {
-            ['Name'] = 'Ring';
-            ['MeshId'] = 'rbxassetid://2637545558';
-        },
-    };
+-- Updated Table (Removed potential hidden spaces/formatting issues)
+Trinkets = {
+    { ['Name'] = 'Goblet', ['MeshId'] = '13116112' },
+    { ['Name'] = 'Amethyst', ['MeshId'] = '2877143560', ['Color'] = Color3.fromRGB(167, 95, 209) },
+    { ['Name'] = 'Diamond', ['MeshId'] = '2877143560', ['Color'] = Color3.fromRGB(248, 248, 248) },
+    { ['Name'] = 'Sapphire', ['MeshId'] = '2877143560', ['Color'] = Color3.fromRGB(0, 0, 255) },
+    { ['Name'] = 'Pure Diamond', ['MeshId'] = '2877143560', ['Color'] = Color3.fromRGB(18, 238, 212) },
+    { ['Name'] = 'Ruby', ['MeshId'] = '2877143560', ['Color'] = Color3.fromRGB(255, 0, 0) },
+    { ['Name'] = 'Emerald', ['MeshId'] = '2877143560', ['Color'] = Color3.fromRGB(31, 128, 29) },
+    { ['Name'] = 'Opal', ['MeshType'] = 'Sphere', ['VertexColor'] = Vector3.new(1, 1, 1) },
+    { ['Name'] = 'Scroll', ['MeshId'] = '60791940' },
+    { ['Name'] = 'Ring', ['MeshId'] = '2637545558' },
+}
 end;
 
 local function normalizeId(id)
@@ -1161,59 +1122,38 @@ local function getHandleMeshInfo(handle)
     };
 end;
 
--- Helper to handle the "floating point" color issue
 local function colorsMatch(c1, c2)
-    local t = 0.02 -- Tolerance: allows for tiny rounding errors
+    local t = 0.05 -- Tolerance for lighting/rounding
     return math.abs(c1.R - c2.R) < t and math.abs(c1.G - c2.G) < t and math.abs(c1.B - c2.B) < t
 end
 
 local function resolveTrinketFromHandle(handle)
-    if (not handle or not handle:IsA('BasePart')) then return nil end
-
-    -- 1. Get the Mesh object
     local mesh = handle:FindFirstChildWhichIsA("SpecialMesh") or handle:FindFirstChild("Mesh")
-    if (not mesh) then return nil end
+    if not mesh then return nil end
 
-    local hMeshId = normalizeId(mesh.MeshId)
-    local hMeshType = mesh.MeshType.Name
+    local hId = normalizeId(mesh.MeshId)
+    local hType = mesh.MeshType.Name
     local hColor = handle.Color
 
-    -- 2. Loop through our data
     for _, trinket in ipairs(Trinkets) do
-        local isMatch = false
+        local idMatch = (trinket.MeshId and normalizeId(trinket.MeshId) == hId)
+        local typeMatch = (trinket.MeshType and trinket.MeshType == hType)
 
-        -- Check by MeshId (Gems, Goblet, Scroll, Ring)
-        if trinket.MeshId and hMeshId ~= "" then
-            if normalizeId(trinket.MeshId) == hMeshId then
-                isMatch = true
-            end
-        -- Check by MeshType (Opal / Sphere)
-        elseif trinket.MeshType and trinket.MeshType == hMeshType then
-            isMatch = true
-        end
-
-        -- 3. If the Mesh matches, verify the Color (if required)
-        if isMatch then
-            -- If the table entry has a specific Color requirement
+        if idMatch or typeMatch then
+            -- If it's a Gem/Opal (has color requirements)
             if trinket.Color then
-                if colorsMatch(hColor, trinket.Color) then
-                    return trinket
-                end
-            -- If the table entry has a VertexColor requirement (Opal)
+                if colorsMatch(hColor, trinket.Color) then return trinket end
             elseif trinket.VertexColor then
                 local vColor = Color3.new(trinket.VertexColor.X, trinket.VertexColor.Y, trinket.VertexColor.Z)
-                if colorsMatch(hColor, vColor) then
-                    return trinket
-                end
+                if colorsMatch(hColor, vColor) then return trinket end
             else
-                -- No color requirement (Goblet/Scroll), so the mesh match is enough!
+                -- It's a Goblet/Scroll/Ring (No color check needed)
                 return trinket
             end
         end
     end
-
-    return nil
 end
+
 do -- // ESP Functions
     function EntityESP:Plugin()
         local classText = '';
