@@ -1192,8 +1192,6 @@ do -- // ESP Functions
             npcObj = espConstructor.new({code = code, vars = {npc}}, npcName);
         end;
         
-        print('Created NPC ESP:', npcName, 'with _showFlag:', npcObj._showFlag);
-
         local connection;
         connection = npc:GetPropertyChangedSignal('Parent'):Connect(function()
             if (not npc.Parent) then
@@ -1247,7 +1245,8 @@ do -- // ESP Section
                 for _, npcName in ipairs(uniqueNpcs) do
                     local toggle = section:AddToggle({
                         text = npcName,
-                        state = true
+                        flag = toCamelCase('Show ' .. npcName),  -- Add this to match ESP's _showFlag
+                        state = true,
                     });
 
                     print('Created toggle for NPC:', npcName, 'with flag:', toggle.flag);
