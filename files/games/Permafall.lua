@@ -1104,7 +1104,9 @@ do -- // Set Trinket Data
 end;
 
 local function normalizeId(id)
-    return tostring(id):gsub('%D', ''):trim()
+    if not id then return "" end
+    local clean = tostring(id):gsub('%D', '') -- Remove all non-digits
+    return clean:match("^%s*(.-)%s*$") or clean -- This is the Roblox way to 'trim'
 end;
 
 local function resolveTrinketFromHandle(handle)
