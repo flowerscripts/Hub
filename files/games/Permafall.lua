@@ -1161,46 +1161,53 @@ local function getHandleMeshInfo(handle)
     };
 end;
 
-local function colorsEqual(a, b)
-    return math.abs(a.R - b.R) < 0.01
-       and math.abs(a.G - b.G) < 0.01
-       and math.abs(a.B - b.B) < 0.01;
-end;
-
+local function colorsMatch(c1, c2, tolerance)
+    if not c1 or not c2 then return false end
+    tolerance = tolerance or 0.01 -- Adjust if detection is still strict
+    return math.abs(c1.R - c2.R) < tolerance and
+           math.abs(c1.G - c2.G) < tolerance and
+           math.abs(c1.B - c2.B) < tolerance
+end
 
 local function resolveTrinketFromHandle(handle)
-    if (not handle or not handle:IsA('BasePart')) then
-        return nil;
-    end;
+    if (not handle or not handle:IsA('BasePart')) then return nil end
 
-    local mesh = handle:FindFirstChildWhichIsA('SpecialMesh');
-    if (not mesh) then
-        return nil;
-    end;
+    local mesh = handle:FindFirstChildWhichIsA("SpecialMesh") or handle:FindFirstChild("Mesh")
+    if not mesh then return nil end
 
-    local meshId = normalizeId(mesh.MeshId);
-    local handleColor = handle.Color;
-
-    local fallback;
-
-    print('Handle Color:', handleColor);
+    local handleMeshId = normalizeId(mesh.MeshId)
+    local handleMeshType = mesh.MeshType.Name
+    local handleColor = handle.Color
 
     for _, trinket in ipairs(Trinkets) do
-        if (trinket.MeshId and normalizeId(trinket.MeshId) == meshId) then
-            if (trinket.Color) then
-                if (colorsEqual(handleColor, trinket.Color)) then
-                    return trinket;
-                end;
+        local match = false
+        
+        if trinket.MeshId and handleMeshId ~= "" then
+            if normalizeId(trinket.MeshId) == handleMeshId then
+                match = true
+            end
+        elseif trinket.MeshType and trinket.MeshType == handleMeshType then
+            match = true
+        end
+
+        if match then
+            if trinket.Color then
+                if colorsMatch(handleColor, trinket.Color) then
+                    return trinket
+                end
+            elseif trinket.VertexColor then
+                local vColor = Color3.new(trinket.VertexColor.X, trinket.VertexColor.Y, trinket.VertexColor.Z)
+                if colorsMatch(handleColor, vColor) then
+                    return trinket
+                end
             else
-                fallback = trinket;
-            end;
-        end;
-    end;
+                return trinket
+            end
+        end
+    end
 
-    return fallback;
-end;
-
-
+    return nil
+end
 
 do -- // ESP Functions
     function EntityESP:Plugin()
