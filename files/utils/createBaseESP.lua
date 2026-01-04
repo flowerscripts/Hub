@@ -217,6 +217,7 @@ local library = sharedRequire('UILibrary.lua');
 			
 			local isEnabled = library.flags[self._showFlag]
 			local instPos = self._instance.Position -- We know it's a Head now
+			local camera = workspace.CurrentCamera;
 
 			local _, visible = worldToViewportPoint(camera, instPos)
 
