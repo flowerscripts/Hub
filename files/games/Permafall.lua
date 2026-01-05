@@ -629,29 +629,22 @@ do -- // Removal Functions
             if (type(args[1]) == 'table' and args[1].InputType == 'Landed') then
                 -- // We overwrite the damage data right before it leaves
                 args[1].StudsFallen = 0
-                args[1].FallBrace = true -- // Tell the server we "braced" to look more legit
-                return oldNamecall(self, unpack(args))
-            end
-        end
+                args[1].FallBrace = library.flags.legitNoFall or false
 
-        return oldNamecall(self, ...)
-    end)
+                return oldNamecall(self, unpack(args));
+            end;
+        end;
+
+        return oldNamecall(self, ...);
+    end);
 
     function functions.noFall(toggle)
         if (not toggle) then
-            if (maid.noFall) then
-                maid.noFall:Destroy();
-                maid.noFall = nil;
-            end;
+            maid.noFall = nil;
             return;
         end;
 
-        -- We use the folder as the "switch" for the hook 
-        -- AND to satisfy the game script's internal check
-        local PressedControl = Instance.new('Folder');
-        PressedControl.Name = 'PressedControl';
-        PressedControl.Parent = LocalPlayer.Character;
-        maid.noFall = PressedControl ;
+        maid.noFall = true;
     end
 
     function functions.noStun(toggle)
