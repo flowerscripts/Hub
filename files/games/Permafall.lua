@@ -914,32 +914,28 @@ do -- // Load All Buyables
 end;
 
 do -- // Automation Functions
-    function functions.autoPickupDroppedItems(toggle)
-        if (not toggle) then
-            maid.autoautoPickupDroppedItems = nil;
-            return;
+
+    function functions.pickupItem(item, isSilver)
+        if (not item and not item.Name:find('Dropped_')) then return end;
+
+        if (isSilver) then
+            if (item:GetAttribute('Silver') > 0 ) then return end;
         end;
 
-        local function pickupItem(item)
-            if (not item) then return end;
-            if (not item.Name:find('Dropped_')) then return end;
-
-            local pickupSilver = library.flags.autoPickupSilver;
-
-            if (not pickupSilver and item:GetAttribute('Silver') > 0) then return end;
-
-            local TouchInterest = FindFirstChildWhichIsA(item, 'TouchTransmitter');
-            if (TouchInterest) then firetouchinterest(LocalPlayer.Character.HumanoidRootPart, item, false); end;
-        end;
-
-        for _, child in workspace.Thrown:GetChildren() do
-            pickupItem(child);
-        end;
-
-        maid.autoPickupDroppedItems = workspace.Thrown.ChildAdded:Connect(pickupItem)
+        local touchInterest = FindFirstChildWhichIsA(item, 'TouchTransmitter');
+        if (touchInterest) then firetouchinterest(LocalPlayer.Character.HumanoidRootPart, item, false); end;
     end;
-end;
 
+    maid.newThrownChild = workspace.Thrown.ChildAdded:Connect(function(child)
+        if (library.flags.autoPickupDroppedItems) then
+            functions.pickupItem(child);
+        end;
+
+        if (library.flags.autoPickupDroppedSilver) then
+            functions.pickupItem(child, isSilver);
+        end;
+    end);
+end;
 
 do -- // Automation
     automation:AddDivider('Pickup')
@@ -947,12 +943,25 @@ do -- // Automation
     automation:AddToggle({
         text = 'Auto Pickup Items',
         tip = 'Automatically picks up any items that get dropped.',
-        callback = functions.autoPickupDroppedItems
+        callback = function(state)
+            if (state) then
+                for _, child in workspace.Thrown:GetChildren() do
+                    functions.pickupItem(child);
+                end;
+            end;
+        end
     })
 
     automation:AddToggle({
         text = 'Auto Pickup Silver',
         tip = 'Automatically picks up any silver that get dropped. [WARNING: THEY HAVE LOGS FOR SILVER PICKUPS]',
+        callback = function(state)
+            if (state) then
+                for _, child in workspace.Thrown:GetChildren() do
+                    functions.pickupItem(child, true);
+                end;
+            end;
+        end
     })
 end;
 
