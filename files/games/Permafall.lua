@@ -594,61 +594,68 @@ local function tweenTeleport(rootPart, position, noWait)
     return tween;
 end;
 
-do -- // Core Hook
-    local oldNamecall
-    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-        local args = {...}
-        local method = getnamecallmethod()
+-- // Services
+local UIS = game:GetService("UserInputService")
+local Players = game:GetService("Players")
 
-        -- Check if we are firing the specific Communicate remote
-        if (method == 'FireServer' and self.Name == 'Communicate') then
-            local data = args[1]
-            
-            -- Safeguard: Ensure the first argument is a table before indexing
-            if type(data) == 'table' then
-                
-                -- No Fall Logic
-                if maid.noFall and data.InputType == 'Landed' then
-                    data.StudsFallen = 0
-                    data.FallBrace = library.flags.legitNoFall or false
-                    return oldNamecall(self, unpack(args))
-                end
+-- // Variables
+local isMovingForward = false
 
-                -- Auto Sprint Logic
-                -- We call IsKeyDown on the SERVICE, not on 'self'
-                if maid.autoSprint and data.InputType == 'Sprinting' then
-                    if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-                        data.Enabled = true
-                    end
-                    return oldNamecall(self, unpack(args))
+-- // Core Hook
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local args = {...}
+    local method = getnamecallmethod()
+
+    if (method == 'FireServer' and self.Name == 'Communicate') then
+        local data = args[1]
+        
+        if type(data) == 'table' then
+            -- No Fall Logic
+            if maid.noFall and data.InputType == 'Landed' then
+                data.StudsFallen = 0
+                data.FallBrace = library.flags.legitNoFall or false
+                return oldNamecall(self, unpack(args))
+            end
+
+            -- Auto Sprint Logic (New Approach: No UIS call inside hook)
+            if maid.autoSprint and data.InputType == 'Sprinting' then
+                -- If our separate listener says we are moving, force Enabled to true
+                if isMovingForward then
+                    data.Enabled = true
                 end
+                return oldNamecall(self, unpack(args))
             end
         end
+    end
 
-        return oldNamecall(self, ...)
-    end)
-end;
+    return oldNamecall(self, ...)
+end)
 
-do -- // Auto Sprint
+-- // Auto Sprint Function
+do
     function functions.autoSprint(toggle)
         if (not toggle) then
-            if maid.sprintBegan then maid.sprintBegan:Disconnect() end
+            isMovingForward = false
+            if maid.sprintLoop then maid.sprintLoop:Disconnect() end
             maid.autoSprint = nil
             return
         end
 
         maid.autoSprint = true
 
-        -- This connection forces the game to start the sprint logic when W is pressed
-        maid.sprintBegan = UserInputService.InputBegan:Connect(function(input, gpe)
+        -- We track the key state outside of the hook to prevent the "Member of RemoteEvent" error
+        maid.sprintLoop = UIS.InputBegan:Connect(function(input, gpe)
             if gpe then return end
             
             if input.KeyCode == Enum.KeyCode.W then
-                -- Based on your error log, the path is Workspace.Live[PlayerName].Communicate
-                local char = LocalPlayer.Character
+                isMovingForward = true
+                
+                local char = Players.LocalPlayer.Character
                 local remote = char and char:FindFirstChild("Communicate")
                 
                 if remote then
+                    -- Send the sprint signal
                     remote:FireServer({
                         ["InputType"] = "Sprinting",
                         ["Enabled"] = true
@@ -656,9 +663,15 @@ do -- // Auto Sprint
                 end
             end
         end)
+
+        -- Track when they stop moving
+        table.insert(maid, UIS.InputEnded:Connect(function(input)
+            if input.KeyCode == Enum.KeyCode.W then
+                isMovingForward = false
+            end
+        end))
     end
 end
-
 do -- // Removal Functions
     function functions.noFall(toggle)
         if (not toggle) then
