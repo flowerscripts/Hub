@@ -916,6 +916,7 @@ end;
 do -- // Automation Functions
     function functions.autoPickupDroppedItems(toggle)
         if (not toggle) then
+            maid.autoautoPickupDroppedItems = nil;
             return;
         end;
 
@@ -927,8 +928,8 @@ do -- // Automation Functions
 
             if (not pickupSilver and item:GetAttribute('Silver') > 0) then return end;
 
-            local TouchInterest = FindFirstChildWhichIsA(item, 'TouchInterest');
-            if (TouchInterest) then firetouchinterest(TouchInterest); end;
+            local TouchInterest = FindFirstChildWhichIsA(item, 'TouchTransmitter');
+            if (TouchInterest) then firetouchinterest(LocalPlayer.Character.HumanoidRootPart, TouchInterest, false); end;
         end;
 
         for _, child in workspace.Thrown:GetChildren() do
@@ -1327,11 +1328,6 @@ do -- // ESP Functions
         if (not item or not item.Name:find('Dropped_')) then return end;
 
         local itemName = item:GetAttribute('Item');
-        local itemOwner = string.gsub(itemName, 'Dropped_', '');
-
-        if (library.flags.showItemOwner) then 
-            itemName = itemName .. ' [OWNER: ' .. itemOwner ..  ']'; 
-        end;
         
         local itemObj;
         if (item:IsA('BasePart') or item:IsA('MeshPart')) then
@@ -1402,12 +1398,6 @@ do -- // ESP Section
             type = 'childAdded',
             args = workspace.Thrown,
             callback = functions.onDroppedItemAdded,
-            onLoaded = function(section)
-                section:AddToggle({
-                    text = 'Show Item Owner',
-                    tip = 'Shows who dropped the Item.',
-                });
-            end
         });
 
         makeESP({
