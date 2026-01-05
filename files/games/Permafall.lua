@@ -493,16 +493,21 @@ do -- // Auto Sprint
             return;
         end;
 
-        local moveKeys = {Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D};
-        local lastRan = 0;
+        local lastAutoTap = 0;
 
         maid.autoSprint = UserInputService.InputBegan:Connect(function(input, gpe)
-            if (gpe or tick() - lastRan < 0.25) then return end;
+            if (gpe) then return end;
 
-            if (table.find(moveKeys, input.KeyCode)) then
-                lastRan = tick();
+            if (input.KeyCode == Enum.KeyCode.W) then
+                local now = tick();
+                
+                if (now - lastAutoTap > 0.5) then 
+                    lastAutoTap = now;
 
-                VirtualInputManager:SendKeyEvent(true, input.KeyCode, false, game);
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game);
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game);
+                    task.wait(0.01); 
+                end;
             end;
         end);
     end;
