@@ -973,6 +973,12 @@ do -- // Automation Functions
                 isSilver = false;
             });
         end;
+
+        if (library.flags.autoPickupChestCoin) then
+            functions.pickupItem(child, {
+                isChestCoin = false;
+            });
+        end;
     end);
 end;
 
@@ -1021,7 +1027,7 @@ do -- // Automation
                 for _, child in Thrown:GetChildren() do
                     if (child and child.Name == 'ChestCoin') then
                         functions.pickupItem(child, {
-                            chestCoin = true;
+                            isChestCoin = true;
                         });
                     end;
                 end;
