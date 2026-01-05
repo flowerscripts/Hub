@@ -652,31 +652,6 @@ do -- // Core Hook
                     args[1].FallBrace = library.flags.legitNoFall or false;
                     
                     return oldNamecall(self, unpack(args));
-                elseif (library.flags.autoAimSagitta and InputType == 'MouseButton1') then
-                    local MouseTarget = args[1].MouseTarget;
-                    if (MouseTarget) then
-                        local mousePosition = args[1].Hit.Position;
-                        local closestCharacter = nil;
-                        local closestDistance = math.huge;
-
-                        for _, entity in next, workspace.Live:GetChildren() do
-                            if (entity == LocalPlayer.Character) then continue end;
-                            local rootPart = entity:FindFirstChild('HumanoidRootPart');
-                            if (not rootPart) then continue end;
-
-                            local distance = (rootPart.Position - mousePosition).Magnitude;
-                            if (distance < closestDistance) then
-                                closestDistance = distance;
-                                closestCharacter = rootPart;
-                            end;
-                        end;
-
-                        if (closestCharacter) then
-                            args[1].Hit = CFrame.new(closestCharacter.Position);
-
-                            return oldNamecall(self, unpack(args));
-                        end;
-                    end;
                 end;
             end;
         end;
