@@ -1086,18 +1086,18 @@ end;
 -- // ------- If Trinket has same MeshId we then check the Handle Color to determine which one it is.
 -- // workspace.TrinketSpawn.SPAWN.Handle.Mesh (Handle is where the UI will be placed and Mesh is how we determine which Trinket it is.)
 
--- We keep this for Goblets/Scrolls/Rings because their IDs often vary in format
+-- Keeps numeric normalization for standard items like Goblets/Scrolls
 local function normalizeId(id)
     if not id then return "" end
     return tostring(id):gsub('%D', '')
 end
 
 do -- // Set Trinket Data
-    -- Your exact confirmed string for Gems
+    -- The exact strict string you provided for Gems
     local GEM_ID_STRICT = "rbxassetid://%202877143560%20" 
 
     Trinkets = {
-        { ['Name'] = 'Goblet', ['MeshId'] = '13116112' },
+        { ['Name'] = 'Goblet', ['MeshId'] = 'rbxassetid://13116112' },
         { ['Name'] = 'Amethyst', ['MeshId'] = GEM_ID_STRICT, ['Color'] = Color3.fromRGB(167, 95, 209) },
         { ['Name'] = 'Diamond', ['MeshId'] = GEM_ID_STRICT, ['Color'] = Color3.fromRGB(248, 248, 248) },
         { ['Name'] = 'Sapphire', ['MeshId'] = GEM_ID_STRICT, ['Color'] = Color3.fromRGB(0, 0, 255) },
@@ -1105,8 +1105,8 @@ do -- // Set Trinket Data
         { ['Name'] = 'Ruby', ['MeshId'] = GEM_ID_STRICT, ['Color'] = Color3.fromRGB(255, 0, 0) },
         { ['Name'] = 'Emerald', ['MeshId'] = GEM_ID_STRICT, ['Color'] = Color3.fromRGB(31, 128, 29) },
         { ['Name'] = 'Opal', ['MeshType'] = 'Sphere', ['VertexColor'] = Vector3.new(1, 1, 1) },
-        { ['Name'] = 'Scroll', ['MeshId'] = '60791940' },
-        { ['Name'] = 'Ring', ['MeshId'] = '2637545558' },
+        { ['Name'] = 'Scroll', ['MeshId'] = 'rbxassetid://60791940' },
+        { ['Name'] = 'Ring', ['MeshId'] = 'rbxassetid://2637545558' },
     }
 end
 
@@ -1116,33 +1116,35 @@ local function resolveTrinketFromHandle(handle)
     if not mesh then return nil end
 
     local hIdRaw = mesh.MeshId
-    local hIdNorm = normalizeId(hIdRaw)
     local hType = mesh.MeshType.Name
     local hColor = handle.Color
 
     for _, trinket in ipairs(Trinkets) do
         local isMatch = false
 
-        -- 1. Check for Strict String Match (Gems)
-        if trinket.MeshId == hIdRaw then
+        -- 1. Check for Opal by MeshType ONLY
+        if trinket.Name == 'Opal' and hType == 'Sphere' then
             isMatch = true
-        -- 2. Check for Normalized Numeric Match (Goblet, Scroll, Ring)
-        elseif trinket.MeshId and normalizeId(trinket.MeshId) == hIdNorm then
+        
+        -- 2. Check for Gems by your EXACT string
+        elseif trinket.MeshId and trinket.MeshId == hIdRaw then
             isMatch = true
-        -- 3. Check for MeshType Match (Opal)
-        elseif trinket.MeshType and trinket.MeshType == hType then
+            
+        -- 3. Check for Goblet/Scroll by numeric ID (normalized)
+        elseif trinket.MeshId and normalizeId(trinket.MeshId) == normalizeId(hIdRaw) then
             isMatch = true
         end
 
         if isMatch then
-            -- Handle items with specific color requirements
+            -- Check color for Gems and Opal
             if trinket.Color then
                 if hColor == trinket.Color then return trinket end
             elseif trinket.VertexColor then
+                -- VertexColor check for Opal
                 local vColor = Color3.new(trinket.VertexColor.X, trinket.VertexColor.Y, trinket.VertexColor.Z)
                 if hColor == vColor then return trinket end
             else
-                -- Items like Goblet/Scroll that don't need color checks
+                -- Goblet/Scroll/Ring
                 return trinket
             end
         end
