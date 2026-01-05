@@ -942,7 +942,7 @@ do -- // Automation Functions
         end;
     end;
 
-    maid.newThrownChild = workspace.Thrown.ChildAdded:Connect(function(child)
+    maid.newThrownChild = workspace:WaitForChild('Thrown').ChildAdded:Connect(function(child)
         task.wait(0.05);
         
         local hasSilver = child:GetAttribute('Silver') and child:GetAttribute('Silver') ~= 0;
@@ -965,7 +965,7 @@ do -- // Automation
         tip = 'Automatically picks up any items that get dropped.',
         callback = function(state)
             if (state) then
-                for _, child in workspace.Thrown:GetChildren() do
+                for _, child in workspace:WaitForChild('Thrown'):GetChildren() do
                     local hasSilver = child:GetAttribute('Silver') and child:GetAttribute('Silver') ~= 0;
                     if (not hasSilver) then
                         functions.pickupItem(child, false);
@@ -980,7 +980,7 @@ do -- // Automation
         tip = 'Automatically picks up any silver that get dropped. [WARNING: THEY HAVE LOGS FOR SILVER PICKUPS]',
         callback = function(state)
             if (state) then
-                for _, child in workspace.Thrown:GetChildren() do
+                for _, child in workspace:WaitForChild('Thrown'):GetChildren() do
                     local hasSilver = child:GetAttribute('Silver') and child:GetAttribute('Silver') ~= 0;
                     if (hasSilver) then
                         functions.pickupItem(child, true);
