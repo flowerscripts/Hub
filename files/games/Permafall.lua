@@ -997,7 +997,7 @@ do -- // Automation
 
     automation:AddToggle({
         text = 'Safe Pickup Silver',
-        tip = 'Safely picks up silver (under 2,000 silver)', 
+        tip = 'Safely picks up silver (under 2,000 silver because 2,000+ triggers logs)', 
         callback = function(state)
             if (state and not library.flags.autoPickupSilver) then
                ToastNotif.new({
