@@ -1093,8 +1093,9 @@ local function normalizeId(id)
 end
 
 do -- // Set Trinket Data
-    -- The exact strict string you provided for Gems
+    -- The exact strict strings confirmed to work in your environment
     local GEM_ID_STRICT = "rbxassetid://%202877143560%20" 
+    local RING_ID_STRICT = "rbxassetid://%202637545558%20"
 
     Trinkets = {
         { ['Name'] = 'Goblet', ['MeshId'] = 'rbxassetid://13116112' },
@@ -1104,9 +1105,9 @@ do -- // Set Trinket Data
         { ['Name'] = 'Pure Diamond', ['MeshId'] = GEM_ID_STRICT, ['Color'] = Color3.fromRGB(18, 238, 212) },
         { ['Name'] = 'Ruby', ['MeshId'] = GEM_ID_STRICT, ['Color'] = Color3.fromRGB(255, 0, 0) },
         { ['Name'] = 'Emerald', ['MeshId'] = GEM_ID_STRICT, ['Color'] = Color3.fromRGB(31, 128, 29) },
-        { ['Name'] = 'Opal', ['MeshType'] = 'Sphere', ['VertexColor'] = Vector3.new(1, 1, 1) },
+        { ['Name'] = 'Opal', ['MeshType'] = 'Sphere' }, -- MeshType check handles this
         { ['Name'] = 'Scroll', ['MeshId'] = 'rbxassetid://60791940' },
-        { ['Name'] = 'Ring', ['MeshId'] = 'rbxassetid://2637545558' },
+        { ['Name'] = 'Ring', ['MeshId'] = RING_ID_STRICT },
     }
 end
 
@@ -1120,35 +1121,40 @@ local function resolveTrinketFromHandle(handle)
     local hColor = handle.Color
 
     -- 1. PRIORITY: OPAL CHECK
-    -- If it's a Sphere, it's an Opal. Period.
+    -- If it's a Sphere shape, resolve as Opal immediately
     if hType == 'Sphere' then
         for _, t in ipairs(Trinkets) do
             if t.Name == 'Opal' then return t end
         end
     end
 
-    -- 2. PRIORITY: GEMS (Strict String)
-    -- Using your exact confirmed string
-    if hIdRaw == "rbxassetid://%202877143560%20" then
-        for _, t in ipairs(Trinkets) do
-            if t.Color and t.Color == hColor then
+    -- 2. PRIORITY: STRICT ID MATCHING (Gems & Ring)
+    -- Matches exact string property values including URL encoding
+    for _, t in ipairs(Trinkets) do
+        if t.MeshId and t.MeshId == hIdRaw then
+            -- If multiple items share this ID (Gems), differentiate by Color
+            if t.Color then
+                if hColor == t.Color then
+                    return t
+                end
+            else
+                -- Unique ID match (like the Ring), return immediately
                 return t
             end
         end
     end
 
-    -- 3. PRIORITY: EVERYTHING ELSE (Normalized)
+    -- 3. FALLBACK: NORMALIZED MATCHING (Goblet, Scroll)
+    -- Catches items where the ID format might vary slightly
     local hIdNorm = normalizeId(hIdRaw)
     for _, t in ipairs(Trinkets) do
         if t.MeshId and normalizeId(t.MeshId) == hIdNorm then
-            -- This catches Goblet, Scroll, Ring
             return t
         end
     end
 
     return nil
 end
-
 do -- // ESP Functions
     function EntityESP:Plugin()
         local classText = '';
