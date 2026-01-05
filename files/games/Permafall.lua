@@ -1326,7 +1326,7 @@ do -- // ESP Functions
         if (not item or not item.Name:find('Dropped_')) then return end;
 
         local itemName = item:GetAttribute('Item');
-        local itemOwner = string.gsub(item, 'Dropped_', '');
+        local itemOwner = string.gsub(itemName, 'Dropped_', '');
 
         if (library.flags.showItemOwner) then 
             itemName = itemName .. ' [OWNER: ' .. itemOwner ..  ']'; 
