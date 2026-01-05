@@ -939,7 +939,7 @@ do -- // Automation Functions
 
         if (not isSilver and hasSilver) then return end;
         if (isSilver and not hasSilver) then return end;
-        if (isSilver and libray.flags.safePickupSilver and item:GetAttribute('Silver') >= 2000) then return end;
+        if (isSilver and library.flags.safePickupSilver and item:GetAttribute('Silver') >= 2000) then return end;
 
         local touchInterest = item:FindFirstChildWhichIsA('TouchTransmitter');
         if (touchInterest) then 
