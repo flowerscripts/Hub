@@ -963,11 +963,15 @@ do -- // Automation Functions
         local hasSilver = child:GetAttribute('Silver') and child:GetAttribute('Silver') ~= 0;
         
         if (library.flags.autoPickupSilver and hasSilver) then
-            functions.pickupItem(child, true);
+            functions.pickupItem(child, {
+                isSilver = true;
+            });
         end;
         
         if (library.flags.autoPickupItems and not hasSilver) then
-            functions.pickupItem(child, false);
+            functions.pickupItem(child, {
+                isSilver = false;
+            });
         end;
     end);
 end;
