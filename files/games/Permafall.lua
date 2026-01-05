@@ -1412,7 +1412,7 @@ do -- // ESP Functions
         local npcName = npc.Name;
 
         local PurchaseInfo = FindFirstChild(npc, 'PurchaseInfo');
-        if (PurchaseInfo) then npcName = PurchaseInfo.ItemName .. ' [Purchasable]'
+        if (PurchaseInfo) then npcName = PurchaseInfo.ItemName .. ' [Purchasable]' end;
         
         local npcObj;
         if (npc:IsA('BasePart') or npc:IsA('MeshPart')) then
