@@ -653,7 +653,7 @@ do -- // Core Hook
                     
                     return oldNamecall(self, unpack(args));
                 elseif (library.flags.autoAimSagitta and InputType == 'MouseButton1') then
-    l               local MouseTarget = args[1].MouseTarget;
+                    local MouseTarget = args[1].MouseTarget;
                     if (MouseTarget) then
                         local mousePosition = args[1].Hit.Position;
                         local closestCharacter = nil;
