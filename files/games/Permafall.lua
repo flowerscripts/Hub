@@ -37,7 +37,7 @@ local column1, column2 = unpack(library.columns);
 
 local functions = {};
 
-local Players, RunService, UserInputService, HttpService, CollectionService, MemStorageService, Lighting, TweenService, VirtualInputManager, ReplicatedFirst = Services:Get(
+local Players, RunService, UserInputService, HttpService, CollectionService, MemStorageService, Lighting, TweenService, VirtualInputManager, ReplicatedFirst, TeleportService = Services:Get(
     'Players', 
     'RunService',
     'UserInputService', 
@@ -47,7 +47,8 @@ local Players, RunService, UserInputService, HttpService, CollectionService, Mem
     'Lighting', 
     'TweenService', 
     'VirtualInputManager',
-    'ReplicatedFirst'
+    'ReplicatedFirst',
+    'TeleportService'
 );
 
 local LocalPlayer = Players.LocalPlayer;
@@ -442,7 +443,7 @@ end;
 			library:UpdateConfig();
 
 			BlockUtils:BlockRandomUser();
-			TeleportService:Teleport(4111023553);
+			TeleportService:Teleport(89371625020632);
 		end;
 	end;
 
