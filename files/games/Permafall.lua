@@ -1087,10 +1087,11 @@ end;
 -- // workspace.TrinketSpawn.SPAWN.Handle.Mesh (Handle is where the UI will be placed and Mesh is how we determine which Trinket it is.)
 
 do -- // Set Trinket Data
-    local GEM_ID = "2028771435602015" 
+    -- Using the exact string literal including the encoded spaces
+    local GEM_ID = "rbxassetid://%202877143560%20" 
 
     Trinkets = {
-        { ['Name'] = 'Goblet', ['MeshId'] = '13116112' },
+        { ['Name'] = 'Goblet', ['MeshId'] = 'rbxassetid://13116112' },
         { ['Name'] = 'Amethyst', ['MeshId'] = GEM_ID, ['Color'] = Color3.fromRGB(167, 95, 209) },
         { ['Name'] = 'Diamond', ['MeshId'] = GEM_ID, ['Color'] = Color3.fromRGB(248, 248, 248) },
         { ['Name'] = 'Sapphire', ['MeshId'] = GEM_ID, ['Color'] = Color3.fromRGB(0, 0, 255) },
@@ -1098,44 +1099,40 @@ do -- // Set Trinket Data
         { ['Name'] = 'Ruby', ['MeshId'] = GEM_ID, ['Color'] = Color3.fromRGB(255, 0, 0) },
         { ['Name'] = 'Emerald', ['MeshId'] = GEM_ID, ['Color'] = Color3.fromRGB(31, 128, 29) },
         { ['Name'] = 'Opal', ['MeshType'] = 'Sphere', ['VertexColor'] = Vector3.new(1, 1, 1) },
-        { ['Name'] = 'Scroll', ['MeshId'] = '60791940' },
-        { ['Name'] = 'Ring', ['MeshId'] = '2637545558' },
+        { ['Name'] = 'Scroll', ['MeshId'] = 'rbxassetid://60791940' },
+        { ['Name'] = 'Ring', ['MeshId'] = 'rbxassetid://2637545558' },
     };
 end;
 
-local function normalizeId(id)
-    if not id then return "" end
-    local clean = tostring(id):gsub('%D', '') -- Remove all non-digits
-    return clean:match("^%s*(.-)%s*$") or clean -- This is the Roblox way to 'trim'
-end;
-
 local function resolveTrinketFromHandle(handle)
-    if not handle or not handle:IsA('BasePart') then return nil end
+    if not handle then return nil end
 
     local mesh = handle:FindFirstChild("Mesh") or handle:FindFirstChildWhichIsA("SpecialMesh")
     if not mesh then return nil end
 
-    local hId = normalizeId(mesh.MeshId)
+    -- Direct property access
+    local hId = mesh.MeshId
     local hType = mesh.MeshType.Name
     local hColor = handle.Color
 
     for _, trinket in ipairs(Trinkets) do
-        -- Check if it's a Mesh ID match or a Mesh Type match (for Opal)
-        local isMatch = (trinket.MeshId and normalizeId(trinket.MeshId) == hId) or 
+        -- Strict string comparison for MeshId or direct match for MeshType
+        local isMatch = (trinket.MeshId and trinket.MeshId == hId) or 
                         (trinket.MeshType and trinket.MeshType == hType)
 
         if isMatch then
-            -- 1. Check Color3 (Gems)
+            -- Check for items that require specific colors (Gems/Opal)
             if trinket.Color then
-                if hColor == trinket.Color then return trinket end
-            
-            -- 2. Check VertexColor (Opal)
+                if hColor == trinket.Color then 
+                    return trinket 
+                end
             elseif trinket.VertexColor then
                 local vColor = Color3.new(trinket.VertexColor.X, trinket.VertexColor.Y, trinket.VertexColor.Z)
-                if hColor == vColor then return trinket end
-            
-            -- 3. No color requirement (Goblet/Scroll)
+                if hColor == vColor then 
+                    return trinket 
+                end
             else
+                -- Items like Goblet/Scroll that only need MeshId match
                 return trinket
             end
         end
@@ -1143,7 +1140,6 @@ local function resolveTrinketFromHandle(handle)
 
     return nil
 end
-
 do -- // ESP Functions
     function EntityESP:Plugin()
         local classText = '';
