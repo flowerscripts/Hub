@@ -739,7 +739,7 @@ do -- // Local Cheats
 	})
     localCheats:AddSlider({
 		min = 16,
-		max = 200,
+		max = 1000,
 		flag = 'Fly Hack Value',
         textpos = 2
 	});
@@ -750,7 +750,7 @@ do -- // Local Cheats
 	})
     localCheats:AddSlider({
 		min = 16,
-		max = 200,
+		max = 1000,
 		flag = 'Speed Hack Value',
         textpos = 2
 	});
@@ -761,7 +761,7 @@ do -- // Local Cheats
 	})
     localCheats:AddSlider({
 		min = 50,
-		max = 250,
+		max = 1000,
 		flag = 'Infinite Jump Height',
         textpos = 2
 	});
