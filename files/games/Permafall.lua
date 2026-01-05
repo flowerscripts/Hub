@@ -920,8 +920,6 @@ do -- // Automation Functions
         if (not item.Name:find('Dropped_')) then return end;
         
         local hasSilver = item:GetAttribute('Silver') and item:GetAttribute('Silver') ~= 0;
-        print('inside function')
-        print(hasSilver);
 
         if (not isSilver and hasSilver) then return end;
         if (isSilver and not hasSilver) then return end;
@@ -959,10 +957,7 @@ do -- // Automation
             if (state) then
                 for _, child in workspace.Thrown:GetChildren() do
                     local hasSilver = child:GetAttribute('Silver') and child:GetAttribute('Silver') ~= 0;
-                    print('inside callback')
-                    print(hasSilver);
                     if (not hasSilver) then
-                        print('og bvro')
                         functions.pickupItem(child, false);
                     end;
                 end;
