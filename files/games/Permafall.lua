@@ -650,9 +650,10 @@ do -- // Core Hook
                     args[1].StudsFallen = 0
                     -- // If legitNoFall is enabled then it'll perfect roll everytime you take "FallDamage". However, you still take 0 damage it just makes it look legit.
                     args[1].FallBrace = library.flags.legitNoFall or false;
-
+                    
+                    return oldNamecall(self, unpack(args));
                 elseif (library.flags.autoAimSagitta and InputType == 'MouseButton1') then
-                    local MouseTarget = args[1].MouseTarget;
+    l               local MouseTarget = args[1].MouseTarget;
                     if (MouseTarget) then
                         local mousePosition = args[1].Hit.Position;
                         local closestCharacter = nil;
@@ -672,11 +673,11 @@ do -- // Core Hook
 
                         if (closestCharacter) then
                             args[1].Hit = CFrame.new(closestCharacter.Position);
+
+                            return oldNamecall(self, unpack(args));
                         end;
                     end;
                 end;
-
-                return oldNamecall(self, unpack(args));
             end;
         end;
 
