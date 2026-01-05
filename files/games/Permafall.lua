@@ -587,6 +587,14 @@ do -- // Mod Logs
 			ToastNotif.new({
 				text = ('Moderator Detected [%s]'):format(player.Name),
 			});
+
+            if (library.flags.panicOnModeratorJoin and not FindFirstChild(LocalPlayer.Character, 'Danger')) then
+                LocalPlayer.Character.Communicate:FireServer({
+                    ["Character"] = LocalPlayer.Character,
+                    ["InputType"] = "menu",
+                    ["Enabled"] = true
+                })
+            end;
 		end;
 	end;
 
@@ -840,6 +848,10 @@ do --// Notifier
 	notifier:AddToggle({
 		text = 'Mod Notifier',
 		state = true
+	});
+
+    notifier:AddToggle({
+		text = 'Panic on Moderator Join'
 	});
 
 	notifier:AddToggle({
@@ -1357,6 +1369,10 @@ do -- // ESP Functions
         if (not item or not item.Name:find('Dropped_')) then return end;
 
         local itemName = item:GetAttribute('Item');
+
+        if (itemName == 'Scroll') then
+            itemName = item.Text.TextLabel.Text -- // Makes it 'Scroll of Imber', 'Scroll of Gelu', etc
+        end;
         
         local itemObj;
         if (item:IsA('BasePart') or item:IsA('MeshPart')) then
