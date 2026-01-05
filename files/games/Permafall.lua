@@ -1007,7 +1007,7 @@ local areaNames = {
     'Tavern';
 }
 
-do -- // Player Classes
+do -- // Setup ESP Data
     playerClassesList = {
         -- // Chaotic Classes
 
@@ -1050,9 +1050,69 @@ do -- // Player Classes
          ['Piandao'] = {
             ['Active'] = {'Blink', 'Lightning Slash', 'AfterImage'};
         }
-     }
+     };
+     
+    Trinkets = {
+        { 
+            ['Name'] = 'Goblet', 
+            ['MeshId'] = 'rbxassetid://13116112' 
+        },
 
-     function functions.getPlayerClass(player)
+        { 
+            ['Name'] = 'Amethyst', 
+            ['MeshId'] = 'rbxassetid://%202877143560%20', 
+            ['Color'] = Color3.fromRGB(167, 95, 209) 
+        },
+
+        { 
+            ['Name'] = 'Diamond', 
+            ['MeshId'] = 'rbxassetid://%202877143560%20', 
+            ['Color'] = Color3.fromRGB(248, 248, 248) 
+        },
+
+        { 
+            ['Name'] = 'Sapphire', 
+            ['MeshId'] = 'rbxassetid://%202877143560%20', 
+            ['Color'] = Color3.fromRGB(0, 0, 255) 
+        },
+
+        { 
+            ['Name'] = 'Pure Diamond', 
+            ['MeshId'] = 'rbxassetid://%202877143560%20', 
+            ['Color'] = Color3.fromRGB(18, 238, 212) 
+        },
+
+        { 
+            ['Name'] = 'Ruby', 
+            ['MeshId'] = 'rbxassetid://%202877143560%20', 
+            ['Color'] = Color3.fromRGB(255, 0, 0) 
+        },
+
+        {
+            ['Name'] = 'Emerald', 
+            ['MeshId'] = 'rbxassetid://%202877143560%20', 
+            ['Color'] = Color3.fromRGB(31, 128, 29) 
+        },
+
+        { 
+            ['Name'] = 'Opal', 
+            ['MeshType'] = 'Sphere' 
+        }, 
+
+        { 
+            ['Name'] = 'Scroll', 
+            ['MeshId'] = 'rbxassetid://60791940' 
+        },
+
+        {
+            ['Name'] = 'Ring', 
+            ['MeshId'] = 'rbxassetid://%202637545558%20' 
+        },
+    };
+end;
+
+do -- // ESP Function Helpers
+    function functions.getPlayerClass(player)
         if (not player) then return 'Freshie' end;
         local Backpack = player.Backpack;
         local classCounts = {};
@@ -1079,82 +1139,45 @@ do -- // Player Classes
         
         return highestCount > 0 and bestClass or 'Freshie';
      end;
+
+    function functions.getTrinket(handle)
+        if (not handle) then return nil end;
+        local Mesh = handle:FindFirstChild('Mesh') or handle:FindFirstChildWhichIsA('SpecialMesh');
+        if (not Mesh) then return nil end;
+
+        local MeshId      = Mesh.MeshId;
+        local MeshType    = Mesh.MeshType.Name;
+        local HandleColor = handle.Color;
+
+        if (MeshType == 'Sphere') then
+            for _, trinket in Trinkets do
+                if (trinket.Name == 'Opal') then return trinket end;
+            end;
+        end;
+
+        for _, trinket in Trinkets do
+            if (trinket.MeshId and trinket.MeshId == MeshId) then
+                if (trinket.Color) then
+                    if (HandleColor == trinket.Color) then
+                        return trinket;
+                    end;
+                else
+                    return trinket;
+                end;
+            end;
+        end;
+
+        local MeshIdNormal = tostring(MeshId):gsub('%D', '')
+        for _, trinket in ipairs(Trinkets) do
+            if (trinket.MeshId and tostring(t.MeshId):gsub('%D', '') == MeshIdNormal) then
+                return trinket;
+            end;
+        end;
+
+        return nil;
+    end;
 end;
 
-
--- // Trinket Data :: Name -> MeshId
--- // ------- If Trinket has same MeshId we then check the Handle Color to determine which one it is.
--- // workspace.TrinketSpawn.SPAWN.Handle.Mesh (Handle is where the UI will be placed and Mesh is how we determine which Trinket it is.)
-
--- Keeps numeric normalization for standard items like Goblets/Scrolls
-local function normalizeId(id)
-    if not id then return "" end
-    return tostring(id):gsub('%D', '')
-end
-
-do -- // Set Trinket Data
-    -- The exact strict strings confirmed to work in your environment
-    local GEM_ID_STRICT = "rbxassetid://%202877143560%20" 
-    local RING_ID_STRICT = "rbxassetid://%202637545558%20"
-
-    Trinkets = {
-        { ['Name'] = 'Goblet', ['MeshId'] = 'rbxassetid://13116112' },
-        { ['Name'] = 'Amethyst', ['MeshId'] = GEM_ID_STRICT, ['Color'] = Color3.fromRGB(167, 95, 209) },
-        { ['Name'] = 'Diamond', ['MeshId'] = GEM_ID_STRICT, ['Color'] = Color3.fromRGB(248, 248, 248) },
-        { ['Name'] = 'Sapphire', ['MeshId'] = GEM_ID_STRICT, ['Color'] = Color3.fromRGB(0, 0, 255) },
-        { ['Name'] = 'Pure Diamond', ['MeshId'] = GEM_ID_STRICT, ['Color'] = Color3.fromRGB(18, 238, 212) },
-        { ['Name'] = 'Ruby', ['MeshId'] = GEM_ID_STRICT, ['Color'] = Color3.fromRGB(255, 0, 0) },
-        { ['Name'] = 'Emerald', ['MeshId'] = GEM_ID_STRICT, ['Color'] = Color3.fromRGB(31, 128, 29) },
-        { ['Name'] = 'Opal', ['MeshType'] = 'Sphere' }, -- MeshType check handles this
-        { ['Name'] = 'Scroll', ['MeshId'] = 'rbxassetid://60791940' },
-        { ['Name'] = 'Ring', ['MeshId'] = RING_ID_STRICT },
-    }
-end
-
-local function resolveTrinketFromHandle(handle)
-    if not handle then return nil end
-    local mesh = handle:FindFirstChild("Mesh") or handle:FindFirstChildWhichIsA("SpecialMesh")
-    if not mesh then return nil end
-
-    local hIdRaw = mesh.MeshId
-    local hType = mesh.MeshType.Name
-    local hColor = handle.Color
-
-    -- 1. PRIORITY: OPAL CHECK
-    -- If it's a Sphere shape, resolve as Opal immediately
-    if hType == 'Sphere' then
-        for _, t in ipairs(Trinkets) do
-            if t.Name == 'Opal' then return t end
-        end
-    end
-
-    -- 2. PRIORITY: STRICT ID MATCHING (Gems & Ring)
-    -- Matches exact string property values including URL encoding
-    for _, t in ipairs(Trinkets) do
-        if t.MeshId and t.MeshId == hIdRaw then
-            -- If multiple items share this ID (Gems), differentiate by Color
-            if t.Color then
-                if hColor == t.Color then
-                    return t
-                end
-            else
-                -- Unique ID match (like the Ring), return immediately
-                return t
-            end
-        end
-    end
-
-    -- 3. FALLBACK: NORMALIZED MATCHING (Goblet, Scroll)
-    -- Catches items where the ID format might vary slightly
-    local hIdNorm = normalizeId(hIdRaw)
-    for _, t in ipairs(Trinkets) do
-        if t.MeshId and normalizeId(t.MeshId) == hIdNorm then
-            return t
-        end
-    end
-
-    return nil
-end
 do -- // ESP Functions
     function EntityESP:Plugin()
         local classText = '';
@@ -1176,8 +1199,8 @@ do -- // ESP Functions
         local Handle = FindFirstChild(spawnPart, 'Handle');
         if (not Handle) then return end;
 
-        local trinketData = resolveTrinketFromHandle(Handle);
-        if (not trinketData) then return end;
+        local Trinket = getTrinket(Handle);
+        if (not Trinket) then return end;
 
         local code = [[
             local Handle = ...;
@@ -1190,7 +1213,7 @@ do -- // ESP Functions
             });
         ]];
 
-        local espObj = espConstructor.new({ code = code, vars = { Handle } }, trinketData.Name);
+        local espObj = espConstructor.new({ code = code, vars = { Handle } }, Trinket.Name);
 
         local connection;
         connection = Handle:GetPropertyChangedSignal('Parent'):Connect(function()
@@ -1238,7 +1261,6 @@ do -- // ESP Functions
         end);
     end;
 end;
-
 
 do -- // ESP Section
     function Utility:renderOverload(data)
