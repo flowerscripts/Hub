@@ -600,32 +600,30 @@ do -- // Core Hook
         local args = {...}
         local method = getnamecallmethod()
 
-        -- Existing No Fall Logic
-        if (maid.noFall and method == 'FireServer' and self.Name == 'Communicate') then
-            if (type(args[1]) == 'table' and args[1].InputType == 'Landed') then
-                args[1].StudsFallen = 0
-                args[1].FallBrace = library.flags.legitNoFall or false
+        if (method == 'FireServer' and self.Name == 'Communicate') then
+            local data = args[1]
+            if type(data) ~= 'table' then return oldNamecall(self, ...) end
+
+            -- Existing No Fall Logic
+            if maid.noFall and data.InputType == 'Landed' then
+                data.StudsFallen = 0
+                data.FallBrace = library.flags.legitNoFall or false
                 return oldNamecall(self, unpack(args))
             end
-        end
 
-        -- // NEW: Auto Sprint Logic
-        -- This intercepts any "Sprinting" signals. 
-        -- If autoSprint is on and the game tries to send a 'Sprinting' = false, 
-        -- we force it to true as long as W is held.
-
-        if (maid.autoSprint and method == 'FireServer' and self.Name == 'Communicate') then
-            if (type(args[1]) == 'table' and args[1].InputType == 'Sprinting') then
-                -- If we are moving forward, force Enabled to true
+            -- // FIXED Auto Sprint Logic
+            if maid.autoSprint and data.InputType == 'Sprinting' then
+                -- Use the UIS variable we defined above
+                -- If we are holding W, we force the server to think Enabled is true
                 if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-                    args[1].Enabled = true
+                    data.Enabled = true
                 end
                 return oldNamecall(self, unpack(args))
             end
         end
 
         return oldNamecall(self, ...)
-    end);
+    end)
 end;
 
 do -- // Auto Sprint
