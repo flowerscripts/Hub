@@ -1328,7 +1328,9 @@ do -- // ESP Functions
         local itemName = item:GetAttribute('Item');
         local itemOwner = string.gsub(item, 'Dropped_', '');
 
-        if (library.flags.showItemOwner) then itemName = itemName .. ' [OWNER: ' itemOwner..  ']';
+        if (library.flags.showItemOwner) then 
+            itemName = itemName .. ' [OWNER: ' itemOwner..  ']'; 
+        end;
         
         local itemObj;
         if (item:IsA('BasePart') or item:IsA('MeshPart')) then
