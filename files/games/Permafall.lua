@@ -643,7 +643,7 @@ do -- // Core Hook
 
         if (getnamecallmethod() == 'FireServer' and self.Name == 'Communicate') then
             if (type(args[1]) == 'table' and args[1].InputType) then
-                local InputType = args[1];
+                local InputType = args[1].InputType;
 
                 if (library.flags.noFallDamage and InputType == 'Landed') then
                     -- // Change StudsFallen to 0 so we take no damage and effectively stop "FallDamage". 
