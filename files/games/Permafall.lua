@@ -37,7 +37,7 @@ local column1, column2 = unpack(library.columns);
 
 local functions = {};
 
-local Players, RunService, UserInputService, HttpService, CollectionService, MemStorageService, Lighting, TweenService, VirtualInputManager = Services:Get(
+local Players, RunService, UserInputService, HttpService, CollectionService, MemStorageService, Lighting, TweenService, VirtualInputManager, ReplicatedFirst = Services:Get(
     'Players', 
     'RunService',
     'UserInputService', 
@@ -46,7 +46,8 @@ local Players, RunService, UserInputService, HttpService, CollectionService, Mem
     'MemStorageService', 
     'Lighting', 
     'TweenService', 
-    'VirtualInputManager'
+    'VirtualInputManager',
+    'ReplicatedFirst'
 );
 
 local LocalPlayer = Players.LocalPlayer;
@@ -485,6 +486,34 @@ end;
         end);
     end;
 
+
+do -- // Auto Sprint
+    -- // AUTO SPRINT LOGIC
+
+    function functions.autoSprint(toggle)
+        if (not toggle) then
+            maid.autoSprint = nil
+            return
+        end
+        maid.autoSprint = true
+
+        -- Force a check immediately when W is pressed
+        maid.sprintLoop = UserInputService.InputBegan:Connect(function(input, gpe)
+            if gpe then return end
+            if input.KeyCode == Enum.KeyCode.W then
+                -- This signals the game's remote that we want to sprint
+                local remote = LocalPlayer.Character:FindFirstChild("Communicate") -- Update path if needed
+                if remote then
+                    remote:FireServer({
+                        ["InputType"] = "Sprinting",
+                        ["Enabled"] = true
+                    })
+                end
+            end
+        end)
+    end
+end;
+
 local myChatLogs = {};
 
 local assetsList = {'ModeratorJoin.mp3', 'ModeratorLeft.mp3'};
@@ -594,84 +623,26 @@ local function tweenTeleport(rootPart, position, noWait)
     return tween;
 end;
 
--- // Services
-local UIS = game:GetService("UserInputService")
-local Players = game:GetService("Players")
+do -- // Core Hook
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, '__namecall', function(self, ...)
+        local args = {...}
 
--- // Variables
-local isMovingForward = false
+        if (getnamecallmethod() == 'FireServer' and self.Name == 'Communicate') then
+            if (maid.noFall and type(args[1]) == 'table' and args[1].InputType == 'Landed') then
+                -- // Change StudsFallen to 0 so we take no damage and effectively stop "FallDamage". 
+                args[1].StudsFallen = 0
+                -- // If legitNoFall is enabled then it'll perfect roll everytime you take "FallDamage". However, you still take 0 damage it just makes it look legit.
+                args[1].FallBrace = library.flags.legitNoFall or false;
 
--- // Core Hook
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local args = {...}
-    local method = getnamecallmethod()
+                return oldNamecall(self, unpack(args));
+            end;
+        end;
 
-    if (method == 'FireServer' and self.Name == 'Communicate') then
-        local data = args[1]
-        
-        if type(data) == 'table' then
-            -- No Fall Logic
-            if maid.noFall and data.InputType == 'Landed' then
-                data.StudsFallen = 0
-                data.FallBrace = library.flags.legitNoFall or false
-                return oldNamecall(self, unpack(args))
-            end
+        return oldNamecall(self, ...);
+    end);
+end;
 
-            -- Auto Sprint Logic (New Approach: No UIS call inside hook)
-            if maid.autoSprint and data.InputType == 'Sprinting' then
-                -- If our separate listener says we are moving, force Enabled to true
-                if isMovingForward then
-                    data.Enabled = true
-                end
-                return oldNamecall(self, unpack(args))
-            end
-        end
-    end
-
-    return oldNamecall(self, ...)
-end)
-
--- // Auto Sprint Function
-do
-    function functions.autoSprint(toggle)
-        if (not toggle) then
-            isMovingForward = false
-            if maid.sprintLoop then maid.sprintLoop:Disconnect() end
-            maid.autoSprint = nil
-            return
-        end
-
-        maid.autoSprint = true
-
-        -- We track the key state outside of the hook to prevent the "Member of RemoteEvent" error
-        maid.sprintLoop = UIS.InputBegan:Connect(function(input, gpe)
-            if gpe then return end
-            
-            if input.KeyCode == Enum.KeyCode.W then
-                isMovingForward = true
-                
-                local char = Players.LocalPlayer.Character
-                local remote = char and char:FindFirstChild("Communicate")
-                
-                if remote then
-                    -- Send the sprint signal
-                    remote:FireServer({
-                        ["InputType"] = "Sprinting",
-                        ["Enabled"] = true
-                    })
-                end
-            end
-        end)
-
-        -- Track when they stop moving
-        table.insert(maid, UIS.InputEnded:Connect(function(input)
-            if input.KeyCode == Enum.KeyCode.W then
-                isMovingForward = false
-            end
-        end))
-    end
-end
 do -- // Removal Functions
     function functions.noFall(toggle)
         if (not toggle) then
@@ -692,11 +663,19 @@ do -- // Removal Functions
             return;
         end;
 
-        maid.antiFire = LocalPlayer.Character.ChildAdded:Connect(function(child)
+        local function removeFire(child)
             if(child and child.Name == 'Burning') then
-                LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{ Enabled = true,  Character = LocalPlayer.Character,  InputType = "Dash"  }}))
+                task.defer(function()
+                    LocalPlayer.Character:WaitForChild("Communicate"):FireServer(unpack({{ Enabled = true,  Character = LocalPlayer.Character,  InputType = "Dash"  }}))
+                end);
             end;
-        end);
+        end;
+
+        for _, child in LocalPlayer.Character:GetChildren() do
+            removeFire(child);
+        end;
+
+        maid.antiFire = LocalPlayer.Character.ChildAdded:Connect(removeFire)
     end;
 
     function functions.noStunLessBlatant(toggle)
@@ -794,7 +773,6 @@ do -- // Local Cheats
 
 	localCheats:AddBind({text = 'Go To Ground', callback = functions.goToGround, mode = 'hold', nomouse = true});
 
-
 	localCheats:AddDivider("Gameplay-Assist");
 
 	localCheats:AddToggle({
@@ -804,11 +782,6 @@ do -- // Local Cheats
 	});
 
 	localCheats:AddDivider("Combat Tweaks");
-
-	localCheats:AddToggle({
-		text = 'One Shot Mobs',
-		tip = 'This feature randomly works sometimes and causes them to die',
-	});
 
 	localCheats:AddBind({
 		text = 'Instant Log',
@@ -880,9 +853,34 @@ do --// Notifier
 	});
 end
 
+local weatherParts = {'Rain', 'Snow'};
+local movedParts = {};
+
 do -- // Performance Functions
     function functions.disableShadows(t)
         Lighting.GlobalShadows = not t;
+    end;
+
+    function functions.disableWeather(t)
+        if (not t) then
+            for part, _ in pairs(movedParts) do
+                if (part and part.Parent == ReplicatedFirst) then
+                    part.Position = LocalPlayer.Character.Head.Position + Vector3.new(0, 10, 0);
+                    part.Parent = workspace.Thrown;
+                end;
+            end;
+
+            table.clear(movedParts) ;
+            return;
+        end;
+
+        for _, weatherName in weatherParts do
+            local weatherPart = workspace.Thrown:FindFirstChild(weatherName);
+            if (weatherPart) then
+                weatherPart.Parent = ReplicatedFirst;
+                movedParts[weatherPart] = true;
+            end;
+        end;
     end;
 end;
 
