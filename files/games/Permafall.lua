@@ -493,28 +493,33 @@ do -- // Auto Sprint
             return;
         end;
 
-        local sprinting = false
+        local isSprinting = false
 
         maid.autoSprint = UserInputService.InputBegan:Connect(function(input, gpe)
             if gpe or input.KeyCode ~= Enum.KeyCode.W then return end;
 
-            -- If we aren't already sprinting, we "Double Tap" for the user
-            if not sprinting then
-                sprinting = true
+            if not isSprinting then
+                isSprinting = true
                 
-                -- 1. Perform the "Ghost Tap" to set the game's timer
+                -- 1. We virtually "Release" W for a split second 
+                -- This ensures the game doesn't see two 'Down' inputs at once
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+                task.wait(0.02)
+                
+                -- 2. Send the first tap of the Double-Tap
                 VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+                task.wait(0.02)
                 
-                -- 2. Your finger is now holding W, which the game sees as the 2nd tap.
-                -- This triggers the game's OWN :Run() function and Remote.
+                -- 3. Send the final "Hold"
+                -- This triggers the game's source code perfectly
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
             end
         end)
 
-        -- We need to reset the 'sprinting' variable when you let go of W
         maid.autoSprintReset = UserInputService.InputEnded:Connect(function(input)
             if input.KeyCode == Enum.KeyCode.W then
-                sprinting = false
+                isSprinting = false
             end
         end)
     end
