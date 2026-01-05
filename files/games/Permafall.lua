@@ -53,6 +53,9 @@ local Players, RunService, UserInputService, HttpService, CollectionService, Mem
 local LocalPlayer = Players.LocalPlayer;
 local playerMouse = LocalPlayer:GetMouse();
 
+local Thrown = workspace.Thrown;
+local Map    = workspace.Map;
+
 local oldAmbient, oldBrightness = Lighting.Ambient, Lighting.Brightness;
 
 local BodyMoverTag = 'good';
@@ -884,7 +887,7 @@ do -- // Performance Functions
             for part, _ in pairs(movedParts) do
                 if (part and part.Parent == ReplicatedFirst) then
                     part.Position = LocalPlayer.Character.Head.Position + Vector3.new(0, 10, 0);
-                    part.Parent = workspace.Thrown;
+                    part.Parent = Thrown;
                 end;
             end;
 
@@ -893,7 +896,7 @@ do -- // Performance Functions
         end;
 
         for _, weatherName in weatherParts do
-            local weatherPart = workspace.Thrown:FindFirstChild(weatherName);
+            local weatherPart = Thrown:FindFirstChild(weatherName);
             if (weatherPart) then
                 weatherPart.Parent = ReplicatedFirst;
                 movedParts[weatherPart] = true;
@@ -938,11 +941,11 @@ do -- // Automation Functions
 
         local touchInterest = item:FindFirstChildWhichIsA('TouchTransmitter');
         if (touchInterest) then 
-            firetouchinterest(LocalPlayer.Character.HumanoidRootPart, item, 1);
+            firetouchinterest(LocalPlayer.Character.HumanoidRootPart, item, 0);
         end;
     end;
 
-    maid.newThrownChild = workspace:WaitForChild('Thrown').ChildAdded:Connect(function(child)
+    maid.newThrownChild = Thrown.ChildAdded:Connect(function(child)
         task.wait(0.05);
         
         local hasSilver = child:GetAttribute('Silver') and child:GetAttribute('Silver') ~= 0;
@@ -965,7 +968,7 @@ do -- // Automation
         tip = 'Automatically picks up any items that get dropped.',
         callback = function(state)
             if (state) then
-                for _, child in workspace:WaitForChild('Thrown'):GetChildren() do
+                for _, child in Thrown:GetChildren() do
                     local hasSilver = child:GetAttribute('Silver') and child:GetAttribute('Silver') ~= 0;
                     if (not hasSilver) then
                         functions.pickupItem(child, false);
@@ -980,7 +983,7 @@ do -- // Automation
         tip = 'Automatically picks up any silver that get dropped. [WARNING: THEY HAVE LOGS FOR SILVER PICKUPS]',
         callback = function(state)
             if (state) then
-                for _, child in workspace:WaitForChild('Thrown'):GetChildren() do
+                for _, child in Thrown:GetChildren() do
                     local hasSilver = child:GetAttribute('Silver') and child:GetAttribute('Silver') ~= 0;
                     if (hasSilver) then
                         functions.pickupItem(child, true);
@@ -1368,13 +1371,10 @@ do -- // ESP Functions
     function functions.onDroppedItemAdded(item, espConstructor)
         if (not item or not item.Name:find('Dropped_')) then return end;
 
-        local itemName = item:GetAttribute('Item');
-
-        if (itemName == 'Scroll') then
-            itemName = item.Text.TextLabel.Text -- // Makes it 'Scroll of Imber', 'Scroll of Gelu', etc
-        end;
+        local itemName = item.Text.TextLabel.Text;
         
         local itemObj;
+        
         if (item:IsA('BasePart') or item:IsA('MeshPart')) then
             itemObj = espConstructor.new(item, itemName);
         else
@@ -1441,7 +1441,7 @@ do -- // ESP Section
        makeESP({
             sectionName = 'Dropped Items',
             type = 'childAdded',
-            args = workspace.Thrown,
+            args = Thrown,
             callback = functions.onDroppedItemAdded,
         });
 
