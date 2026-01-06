@@ -641,7 +641,7 @@ do -- // Core Hook
         if(not character) then return end;
 
         task.delay(1,function()
-            ReplicatedStorage.GetMouseHit.OnClientInvoke = function()
+            ReplicatedStorage:WaitForChild('GetMouseHit').OnClientInvoke = function()
                 local mouseT = {};
 
                 mouseT.Hit = playerMouse.Hit;
@@ -650,7 +650,7 @@ do -- // Core Hook
                 mouseT.X = playerMouse.X;
                 mouseT.Y = playerMouse.Y;
 
-                if (library.flags.silentAim) then
+                if (library.flags.autoAimSpells) then
                     local target = Utility:getClosestCharacter(rayParams);
                     target = target and target.Character;
 
