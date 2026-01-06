@@ -92,6 +92,8 @@ local BodyMoverTag = 'good';
 
 local myRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('HumanoidRootPart');
 
+local DUNGEON_PLACE_ID = 89371625020632;
+
 do -- // Inventory Viewer (SMH)
     local inventoryLabels = {};
     local itemColors = {};
@@ -985,9 +987,15 @@ do --// Notifier
 		state = true
 	});
 
-	notifier:AddToggle({
-		text = 'Blessing Notifier',
-	});
+    if (game.PlaceId == DUNGEON_PLACE_ID) then
+        notifier:AddToggle({
+            text = 'Blessing Notifier',
+        });
+
+        notifier:AddToggle({
+            text = 'Race Reroll Notifier',
+        });
+    end;
 
 	notifier:AddToggle({
 		text = 'Player Proximity Check',    
@@ -1057,8 +1065,9 @@ do -- // Automation Functions
         local isChestCoin = data.isChestCoin;
 
         if (not item) then return end;
-        if (not isChestCoin and not item.Name:find('Dropped_')) then return end;
+        if (not isChestCoin and not isSilver and not item.Name:find('Dropped_')) then return end;
         if (isChestCoin and item.Name ~= 'ChestCoin') then return end;
+        if (isSilver and item.Name ~= 'ChestSilver' and not item.Name:find('Dropped_')) then return end;
         
         local hasSilver = item:GetAttribute('Silver') and item:GetAttribute('Silver') ~= 0;
 
@@ -1430,35 +1439,63 @@ do -- // Setup ESP Data
         },
     };
 
-    Chests = {
-        {
-            ['Name'] = 'Trinket',
-        },
+    if (game.PlaceId == DUNGEON_PLACE_ID) then
+        Chests = {
+            {
+                ['Name'] = 'Trinket',
+            },
 
-        {
-            ['Name'] = 'Silver',
-        },
+            {
+                ['Name'] = 'Silver',
+            },
 
-        {
-            ['Name'] = 'Gold',
-        },
-        
-        {
-            ['Name'] = 'Race Reroll',
-        },
+            {
+                ['Name'] = 'Gold',
+            },
+            
+            {
+                ['Name'] = 'Race Reroll',
+            },
 
-        {
-            ['Name'] = 'Chest Food',
-        },
+            {
+                ['Name'] = 'Chest Food',
+            },
 
-        {
-            ['Name'] = 'Blessing',
-        },
-
-        {
-            ['Name'] = 'Chest Coin'
+            {
+                ['Name'] = 'Blessing',
+            },
         }
-    }
+    else
+        Chests = {
+            {
+                ['Name'] = 'Trinket',
+            },
+
+            {
+                ['Name'] = 'Silver',
+            },
+
+            {
+                ['Name'] = 'Gold',
+            },
+            
+            {
+                ['Name'] = 'Race Reroll',
+            },
+
+            {
+                ['Name'] = 'Chest Food',
+            },
+
+            {
+                ['Name'] = 'Blessing',
+            },
+
+            {
+                ['Name'] = 'Chest Coin'
+            }
+        }
+    end;  
 end;
 
 
@@ -1615,7 +1652,11 @@ do -- // ESP Functions
 
     function functions.onNewChestAdded(chest, espConstructor)
         if (not chest.Name:find('Chest')) then return end;
+        if (chest.Name == 'ChestSIlver') then return end;
         local chestName = chest.Name;
+
+        local isChestOpened = FindFirstChild(chest, 'Opened');
+        if (isChestOpened and library.flags.hideOpenedChests) then return end;
      
         if (chestName == 'Chest1') then
             local typeOfChest = FindFirstChild(chest, 'Silver') or FindFirstChild(chest, 'Trinket');
@@ -1627,6 +1668,12 @@ do -- // ESP Functions
             chestName = 'Chest Food';
         elseif (chestName == 'ChestRR') then
             chestName = 'Race Reroll';
+
+            if (library.flags.raceRerollNotifier) then
+                ToastNotif.new({
+                    text = 'A Race Reroll has spawned!'
+                });
+            end;
         elseif (chestName == 'Chest Coin') then
             chestName = 'Chest Coin';
         elseif (chestName == 'ChestBlue') then
@@ -1773,7 +1820,7 @@ do -- // ESP Section
             callback = functions.onNewChestAdded,
             onLoaded = function(section)
                 section:AddToggle({
-                    text = 'Show Opened Chests';
+                    text = 'Hide Opened Chests';
                 });
                 return {list = makeList(Chests, section)};
             end,
