@@ -1449,7 +1449,7 @@ do -- // Setup ESP Data
 
         {
             ['Name'] = 'Chest Food',
-        }
+        },
 
         {
             ['Name'] = 'Blessing',
