@@ -734,6 +734,82 @@ do -- // Removal Functions
 
         maid.antiFire = LocalPlayer.Character.ChildAdded:Connect(removeFire)
     end;
+
+    do -- One Shot NPCs
+		local mobs = {};
+
+		local NetworkOneShot = {};
+		NetworkOneShot.__index = NetworkOneShot;
+
+		function NetworkOneShot.new(mob)
+			local self = setmetatable({},NetworkOneShot);
+
+			self._maid = Maid.new();
+			self.char = mob;
+
+			self._maid:GiveTask(mob.Destroying:Connect(function()
+				self:Destroy();
+			end));
+
+			self._maid:GiveTask(Utility.listenToChildAdded(mob, function(obj)
+				if (obj.Name == 'HumanoidRootPart') then
+					self.hrp = obj;
+				end;
+			end));
+
+			mobs[mob] = self;
+			return self;
+		end;
+
+		function NetworkOneShot:Update()
+			if (not self.hrp or not isnetworkowner(self.hrp) or not self.hrp.Parent or self.hrp.Parent.Parent ~= workspace.Live) then return end;
+			self.char:PivotTo(CFrame.new(self.hrp.Position.X, workspace.FallenPartsDestroyHeight - 100000, self.hrp.Position.Z));
+		end;
+
+		function NetworkOneShot:Destroy()
+			self._maid:DoCleaning();
+
+			for i,v in next, mobs do
+				if (v ~= self) then continue; end
+				mobs[i] = nil;
+			end;
+		end;
+
+		function NetworkOneShot:ClearAll()
+			for _, v in next, mobs do
+				v:Destroy();
+			end;
+
+			table.clear(mobs);
+		end;
+
+		Utility.listenToChildAdded(workspace.Live, function(obj)
+			task.wait(0.2);
+			if (obj == LocalPlayer.Character) then return; end
+			NetworkOneShot.new(obj);
+		end);
+
+		function functions.networkOneShot(t)
+			if (not t) then
+				maid.networkOneShot = nil;
+				maid.networkOneShot2 = nil;
+				return;
+			end;
+
+			maid.networkOneShot2 = RunService.Heartbeat:Connect(function()
+				sethiddenproperty(LocalPlayer, 'MaxSimulationRadius', math.huge);
+				sethiddenproperty(LocalPlayer, 'SimulationRadius', math.huge);
+			end);
+
+			maid.networkOneShot = task.spawn(function()
+				while task.wait() do
+					for _, mob in next, mobs do
+						mob:Update();
+					end;
+				end;
+			end);
+		end;
+	end;
 end;
 
 do -- // Removals
@@ -838,28 +914,10 @@ do -- // Local Cheats
 
 	localCheats:AddDivider("Combat Tweaks");
 
-	localCheats:AddBind({
-		text = 'Instant Log',
-		nomouse = true,
-		callback = function()
-            LocalPlayer.Character.Communicate:FireServer({
-                ["Character"] = LocalPlayer.Character,
-                ["InputType"] = "menu",
-                ["Enabled"] = true
-            })
-		end
-	});
-
-	localCheats:AddButton({
-		text = 'Server Hop',
-		tip = 'Jumps to any other server, non region dependant',
-		callback = functions.serverHop
-	});
-
-    localCheats:AddButton({
-		text = 'Respawn',
-		tip = 'Kills the character prompting it to respawn',
-		callback = functions.respawn
+    localCheats:AddToggle({
+		text = 'One Shot Mobs',
+		tip = 'This feature randomly works sometimes and causes them to die, but it makes AP have issues',
+		callback = functions.networkOneShot
 	});
 
 	localCheats:AddBind({
@@ -882,6 +940,30 @@ do -- // Local Cheats
 		min = -100,
 		max = 100,
 		textpos = 2
+	});
+
+    localCheats:AddBind({
+		text = 'Instant Log',
+		nomouse = true,
+		callback = function()
+            LocalPlayer.Character.Communicate:FireServer({
+                ["Character"] = LocalPlayer.Character,
+                ["InputType"] = "menu",
+                ["Enabled"] = true
+            })
+		end
+	});
+
+	localCheats:AddButton({
+		text = 'Server Hop',
+		tip = 'Jumps to any other server, non region dependant',
+		callback = functions.serverHop
+	});
+
+    localCheats:AddButton({
+		text = 'Respawn',
+		tip = 'Kills the character prompting it to respawn',
+		callback = functions.respawn
 	});
 end;
 
