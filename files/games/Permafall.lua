@@ -55,23 +55,6 @@ local Players, RunService, UserInputService, HttpService, CollectionService, Mem
 local LocalPlayer = Players.LocalPlayer;
 local playerMouse = LocalPlayer:GetMouse();
 
-local Thrown = workspace.Thrown;
-local Map    = workspace.Map;
-
-local oldAmbient, oldBrightness;
-
-local BodyMoverTag = 'good';
-
-local myRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('HumanoidRootPart');
-
-local IsA = game.IsA;
-local FindFirstChild = game.FindFirstChild;
-local FindFirstChildWhichIsA = game.FindFirstChildWhichIsA;
-local IsDescendantOf = game.IsDescendantOf;
-
-local Trinkets = {};
-local playerClassesList = {};
-
 local maid = Maid.new();
 
 local localCheats = column1:AddSection('Local Cheats');
@@ -83,11 +66,31 @@ local visuals = column2:AddSection('Visuals');
 local farms = column2:AddSection('Farms');
 local inventoryViewer = column2:AddSection('Inventory Viewer');
 
+local IsA = game.IsA;
+local FindFirstChild = game.FindFirstChild;
+local FindFirstChildWhichIsA = game.FindFirstChildWhichIsA;
+local IsDescendantOf = game.IsDescendantOf;
+
+local Trinkets = {};
+local playerClassesList = {};
+
+local rayParams = RaycastParams.new();
+rayParams.FilterDescendantsInstances = {workspace.Live};
+rayParams.FilterType = Enum.RaycastFilterType.Blacklist;
 
 local NPCFolder = workspace.NPCs;
 
 local Armors, Weapons, Items, NPCs = {}, {}, {}, {};
 local ArmorSelected, WeaponSelected, ItemSelected, NPCSelected;
+
+local Thrown = workspace.Thrown;
+local Map    = workspace.Map;
+
+local oldAmbient, oldBrightness;
+
+local BodyMoverTag = 'good';
+
+local myRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('HumanoidRootPart');
 
 do -- // Inventory Viewer (SMH)
     local inventoryLabels = {};
