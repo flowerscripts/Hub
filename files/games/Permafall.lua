@@ -1628,7 +1628,7 @@ do -- // ESP Functions
         end;
         
         local chestObj;
-        if (chestObj:IsA('BasePart') or chest:IsA('MeshPart')) then
+        if (chest:IsA('BasePart') or chest:IsA('MeshPart')) then
             chestObj = espConstructor.new(chest, chestName);
         else
             local code = [[
