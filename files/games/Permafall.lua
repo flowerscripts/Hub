@@ -641,46 +641,46 @@ local function tweenTeleport(rootPart, position, noWait)
 end;
 
 do -- // Core Hook
-    local function onCharacterAdded(character)
-        if(not character) then return end;
+    -- local function onCharacterAdded(character)
+    --     if(not character) then return end;
 
-        task.delay(1,function()
-            ReplicatedStorage.GetMouseHit.OnClientInvoke = function()
-                local mouseT = {};
+    --     task.delay(1,function()
+    --         ReplicatedStorage.GetMouseHit.OnClientInvoke = function()
+    --             local mouseT = {};
 
-                mouseT.Hit = playerMouse.Hit;
-                mouseT.Target = playerMouse.Target;
-                mouseT.UnitRay = playerMouse.UnitRay;
-                mouseT.X = playerMouse.X;
-                mouseT.Y = playerMouse.Y;
+    --             mouseT.Hit = playerMouse.Hit;
+    --             mouseT.Target = playerMouse.Target;
+    --             mouseT.UnitRay = playerMouse.UnitRay;
+    --             mouseT.X = playerMouse.X;
+    --             mouseT.Y = playerMouse.Y;
 
-                if (library.flags.autoAimSpells) then
-                    local target = Utility:getClosestCharacter(rayParams);
-                    target = target and target.Character;
+    --             if (library.flags.autoAimSpells) then
+    --                 local target = Utility:getClosestCharacter(rayParams);
+    --                 target = target and target.Character;
 
-                    local cam = workspace.CurrentCamera;
-                    local worldToViewportPoint = cam.WorldToViewportPoint;
-                    local viewportPointToRay = cam.ViewportPointToRay;
+    --                 local cam = workspace.CurrentCamera;
+    --                 local worldToViewportPoint = cam.WorldToViewportPoint;
+    --                 local viewportPointToRay = cam.ViewportPointToRay;
 
-                    if (target and target.PrimaryPart) then
-                        local pos = worldToViewportPoint(cam, target.PrimaryPart.Position);
+    --                 if (target and target.PrimaryPart) then
+    --                     local pos = worldToViewportPoint(cam, target.PrimaryPart.Position);
 
-                        mouseT.Hit = target.PrimaryPart.CFrame;
-                        mouseT.Target = target.PrimaryPart;
-                        mouseT.X = pos.X;
-                        mouseT.Y = pos.Y;
-                        mouseT.UnitRay = viewportPointToRay(cam, pos.X, pos.Y, 1)
-                        mouseT.Hit = target.PrimaryPart.CFrame;
-                    end;
-                end;
+    --                     mouseT.Hit = target.PrimaryPart.CFrame;
+    --                     mouseT.Target = target.PrimaryPart;
+    --                     mouseT.X = pos.X;
+    --                     mouseT.Y = pos.Y;
+    --                     mouseT.UnitRay = viewportPointToRay(cam, pos.X, pos.Y, 1)
+    --                     mouseT.Hit = target.PrimaryPart.CFrame;
+    --                 end;
+    --             end;
 
-                return mouseT;
-            end;
-        end);
-    end;
+    --             return mouseT;
+    --         end;
+    --     end);
+    -- end;
 
-    onCharacterAdded(LocalPlayer.Character);
-    LocalPlayer.CharacterAdded:Connect(onCharacterAdded);
+    -- onCharacterAdded(LocalPlayer.Character);
+    -- LocalPlayer.CharacterAdded:Connect(onCharacterAdded);
 
     local oldNamecall;
 
