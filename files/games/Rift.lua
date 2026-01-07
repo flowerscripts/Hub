@@ -538,9 +538,7 @@ do -- // Entity ESP
                 text = 'Show Health',
                 flag = 'Mobs Show Health'
             });
-            onLoaded = function(section)
-                return {list = makeList(Mobs, section)};
-            end,
+            return {list = makeList(Mobs, section)};
         end
     });
 end;
