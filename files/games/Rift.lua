@@ -530,8 +530,6 @@ do -- // Entity ESP
     end;
 
     local function onNewMobAdded(mob, espConstructor)
-        if (not CollectionService:HasTag(mob, 'Mob')) then return end;
-
         local code = [[
             local mob = ...;
             local FindFirstChild = game.FindFirstChild;
@@ -553,10 +551,6 @@ do -- // Entity ESP
 
         local formattedName = formatMobName(mob.Name);
         local mobEsp = espConstructor.new({code = code, vars = {mob}}, formattedName);
-
-        if (formattedName == 'Megalodaunt Legendary' and library.flags.artifactNotifier) then
-            ToastNotif.new({text = 'A red sharko has spawned, go check songseeker!'});
-        end;
 
         local connection;
         connection = mob:GetPropertyChangedSignal('Parent'):Connect(function()
