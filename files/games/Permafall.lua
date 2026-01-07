@@ -1068,7 +1068,7 @@ do -- // Automation Functions
         if (not item) then return end;
         
         if (isChestCoin and item.Name ~= 'ChestCoin') then return end;
-        if (isChestLoot and not item.Name:find('Chest')) then return end;
+        if (isChestLoot and not item.Name:find('Chest') and item.Name ~= 'GoldBar') then return end;
         if (not isChestCoin and not isSilver and not isChestLoot and not item.Name:find('Dropped_')) then return end;
         if (isSilver and item.Name ~= 'ChestSIlver' and not item.Name:find('Dropped_')) then return end;
         
@@ -1111,7 +1111,7 @@ do -- // Automation Functions
 
         if (library.flags.autoPickupChestLoot) then
             functions.pickupItem(child, {
-                isChestLoot  = false;
+                isChestLoot  = true;
             });
         end;
     end);
@@ -1479,34 +1479,19 @@ do -- // Setup ESP Data
     else
         Chests = {
             {
-                ['Name'] = 'Trinket',
-            },
-
-            {
-                ['Name'] = 'Silver',
-            },
-
-            {
-                ['Name'] = 'Gold',
-            },
-            
-            {
-                ['Name'] = 'Race Reroll',
-            },
-
-            {
-                ['Name'] = 'Chest Food',
-            },
-
-            {
-                ['Name'] = 'Blessing',
-            },
-
-            {
                 ['Name'] = 'Chest Coin'
             }
         }
-    end;  
+    end; 
+    
+    Mobs = {
+        {
+            ['Name'] = 'Goblin';
+        },
+        {
+            ['Name'] = '#HITBOX_SIMULATION';
+        }
+    }
 end;
 
 
@@ -1583,6 +1568,20 @@ do -- // ESP Function Helpers
 end;
 
 do -- // ESP Functions
+    local function formatMobName(mobName)
+        if (not mobName:match('%.(.-)%d+')) then return mobName end;
+        local allMobLetters = mobName:match('%.(.-)%d+'):gsub('_', ' '):split(' ');
+
+        for i, v in next, allMobLetters do
+            local partialLetters = v:split('');
+            partialLetters[1] = partialLetters[1]:upper();
+
+            allMobLetters[i] = table.concat(partialLetters);
+        end;
+
+        return table.concat(allMobLetters, ' ');
+    end;
+
     function EntityESP:Plugin()
         local classText = '';
 
@@ -1657,6 +1656,48 @@ do -- // ESP Functions
             if (not item.Parent) then
                 itemObj:Destroy();
                 connection:Disconnect();
+            end;
+        end);
+    end;
+
+    function functions.onNewMobAdded(mob, espConstructor)
+        if (FindFirstChild(Players, mob.Name)) then return end;
+
+        local editedMobName;
+
+        if (mob.Name == 'generate') then
+            if (FindFirstChild(Throw, 'Chest1')) then
+                editedMobName = 'Hobo';
+            end;
+        end;
+
+        local code = [[
+            local mob = ...;
+            local FindFirstChild = game.FindFirstChild;
+            local FindFirstChildWhichIsA = game.FindFirstChildWhichIsA;
+
+            return setmetatable({
+                FindFirstChildWhichIsA = function(_, ...)
+                    return FindFirstChildWhichIsA(mob, ...);
+                end,
+            }, {
+                __index = function(_, p)
+                    if (p == 'Position') then
+                        local mobRoot = FindFirstChild(mob, 'HumanoidRootPart');
+                        return mobRoot and mobRoot.Position;
+                    end;
+                end,
+            })
+        ]];
+
+        local formattedName = formatMobName(editedMobName or mob.Name);
+        local mobEsp = espConstructor.new({code = code, vars = {mob}}, formattedName);
+
+        local connection;
+        connection = mob:GetPropertyChangedSignal('Parent'):Connect(function()
+            if (not mob.Parent) then
+                connection:Disconnect();
+                mobEsp:Destroy();
             end;
         end);
     end;
@@ -1836,6 +1877,20 @@ do -- // ESP Section
             onLoaded = function(section)
                 return {list = makeList(Trinkets, section)};
             end,
+        });
+
+        makeESP({
+            sectionName = 'Mobs',
+            type = 'childAdded',
+            args = workspace.Live,
+            callback = onNewMobAdded,
+            onLoaded = function(section)
+                section:AddToggle({
+                    text = 'Show Health',
+                    flag = 'Mobs Show Health'
+                });
+                return {list = makeList(Mobs, section)};
+            end
         });
 
         makeESP({
