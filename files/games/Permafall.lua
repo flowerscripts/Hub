@@ -1085,9 +1085,8 @@ do -- // Automation Functions
         end;
 
         local touchInterest = item:FindFirstChildWhichIsA('TouchTransmitter');
-            if (touchInterest) then 
-                firetouchinterest(LocalPlayer.Character.HumanoidRootPart, item, 0);
-            end;
+        if (touchInterest) then 
+            firetouchinterest(LocalPlayer.Character.HumanoidRootPart, item, 0);
         end;
     end;
 
@@ -1724,6 +1723,7 @@ do -- // ESP Functions
     end;
 
     function functions.onNewChestAdded(chest, espConstructor)
+        if (not chest) then return end;
         if (not chest.Name:find('Chest')) then return end;
         if (chest.Name == 'ChestSIlver') then return end;
         local chestName = chest.Name;
