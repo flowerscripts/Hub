@@ -68,128 +68,7 @@ local oldAmbient, oldBrightness;
 
 local myRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('HumanoidRootPart');
 
-do -- // Inventory Viewer (SMH)
-    local inventoryLabels = {};
-    local itemColors = {};
 
-    itemColors[100] = Color3.new(0.76862699999999995, 1, 0);
-    itemColors[9] = Color3.new(1, 0.90000000000000002, 0.10000000000000001);
-    itemColors[10] = Color3.new(0, 1, 0);
-    itemColors[11] = Color3.new(0.90000000000000002, 0, 1);
-    itemColors[3] = Color3.new(0, 0.80000000000000004, 1);
-    itemColors[8] = Color3.new(0.17254900000000001, 0.80000000000000004, 0.64313699999999996);
-    itemColors[7] = Color3.new(0.2588, 0.6588, 0.3490); -- Regular Spell
-    itemColors[6] = Color3.new(1, 0, 0);
-    itemColors[4] = Color3.new(0.82745100000000005, 0.466667, 0.207843);
-    itemColors[0] = Color3.new(1, 1, 1);
-    itemColors[5] = Color3.new(0.33333299999999999, 0, 1);
-    itemColors[999] = Color3.new(0.792156, 0.792156, 0.792156);
-    itemColors[87] = Color3.new(0.235, 0.714, 0.961); -- God Spell
-
-    local function getToolType(tool)
-        if (tool:FindFirstChild("PrimaryWeapon"))then
-            return 0;
-        elseif (tool:FindFirstChild("Skill") or tool:FindFirstChild('Activator')) then
-            return 8;
-        elseif (tool:FindFirstChild("Droppable")) then
-            return 6;
-        elseif (tool:FindFirstChild("Spell")) then
-            if (tool:FindFirstChild('Godspell')) then
-                return 87;
-            end;
-            return 7;
-        elseif (tool:FindFirstChild("Trinket")) then
-            return 4;
-        elseif (tool:FindFirstChild("COWL")) then
-
-            return 100;	
-        elseif (tool:FindFirstChild("Active") or tool.Parent.Name == "Novachrono" or tool.Parent.Name == "Muto's Blood") then
-            return 5;
-        elseif (tool:FindFirstChild("Schematic")) then
-            return 8;
-        elseif (tool:FindFirstChild("Ingredient")) then
-            return 10;
-        elseif (tool:FindFirstChild("SpellIngredient")) then
-            return 11;
-        elseif (tool:FindFirstChild("Item")) then
-            return 9;
-        end
-
-        return 999;
-    end;
-
-    local function showPlayerInventory(player)
-        if (typeof(player) ~= 'Instance') then return end;
-
-        for _, v in next, inventoryLabels do
-            v.main:Destroy();
-        end;
-
-        inventoryLabels = {};
-
-        local playerItems = {};
-        local seen = {};
-        local seenJSON = {};
-
-        local function onBackpackChildAdded(tool)
-            debug.profilebegin('onBackpackChildAdded');
-            local toolName = tool:GetAttribute('DisplayName') or tool.Name:gsub('[^:]*:', ''):gsub('%$[^%$]*', '');
-            local toolType = getToolType(tool);
-            local weaponData = tool:FindFirstChild('WeaponData');
-
-            xpcall(function()
-                weaponData = seenJSON[weaponData] or HttpService:JSONDecode(weaponData.Value);
-            end, function()
-                weaponData = crypt.base64decode(weaponData.Value);
-                weaponData = weaponData:sub(1, #weaponData - 2);
-
-                weaponData = HttpService:JSONDecode(weaponData);
-            end);
-
-            if (typeof(weaponData) == 'table') then
-                table.foreach(weaponData, warn);
-                toolName = string.format('%s%s', toolName, (weaponData.Soulbound or weaponData.SoulBound) and ' [Soulbound]' or '');
-            end;
-
-            local exitingPlayerItem = seen[toolName];
-
-            if (exitingPlayerItem) then
-                exitingPlayerItem.quantity += 1;
-                return;
-            end;
-
-            local playerItem =  {
-                type = toolType,
-                toolName = toolName,
-                quantity = 1
-            };
-
-            table.insert(playerItems, playerItem);
-            seen[toolName] = playerItem;
-        end;
-
-        for _, tool in next, player.Backpack:GetChildren() do
-            task.spawn(onBackpackChildAdded, tool);
-        end;
-
-        table.sort(playerItems, function(a, b)
-            return a.type < b.type;
-        end);
-
-        for _, v in next, playerItems do
-            v.text = ('<font color="#%s">%s [x%d]</font>'):format(itemColors[v.type]:ToHex(), v.toolName, v.quantity);
-            table.insert(inventoryLabels, inventoryViewer:AddLabel(v.text));
-        end;
-    end;
-
-    inventoryViewer:AddList({
-        text = 'Player',
-        tip = 'Player to watch inventory for',
-        playerOnly = true,
-        skipflag = true,
-        callback = showPlayerInventory
-    });
-end
 
 do -- // Functions
     function functions.speedHack(toggle)
@@ -524,12 +403,6 @@ do -- // Local Cheats
 		callback = functions.noClip
 	});
 
-    localCheats:AddToggle({
-		text = 'Knocked Ownership',
-		tip = 'Allow you to fly/move while being knocked.',
-        callback = functions.knockedOwnership
-	})
-
 	localCheats:AddToggle({
 		text = 'Click Destroy',
 		tip = 'Everything you click on will be destroyed (client sided)',
@@ -580,13 +453,5 @@ do -- // Local Cheats
 		text = 'Respawn',
 		tip = 'Kills the character prompting it to respawn',
 		callback = functions.respawn
-	});
-end;
-
-do --// Notifier
-	notifier:AddToggle({
-		text = 'Player Proximity Check',    
-		tip = 'Gives you a warning when a player is close to you',
-		callback = functions.playerProximityCheck
 	});
 end;
