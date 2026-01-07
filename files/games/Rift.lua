@@ -538,7 +538,7 @@ do -- // Entity ESP
                 text = 'Show Health',
                 flag = 'Mobs Show Health'
             });
-            return {list = makeList(Mobs, section)};
+            return {list = makeList(validMobs, section)};
         end
     });
 end;
