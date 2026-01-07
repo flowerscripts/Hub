@@ -455,3 +455,92 @@ do -- // Local Cheats
 		callback = functions.respawn
 	});
 end;
+
+local function formatMobName(mobName)
+	if (not mobName:match('%.(.-)%d+')) then return mobName end;
+	local allMobLetters = mobName:match('%.(.-)%d+'):gsub('_', ' '):split(' ');
+
+	for i, v in next, allMobLetters do
+		local partialLetters = v:split('');
+		partialLetters[1] = partialLetters[1]:upper();
+
+		allMobLetters[i] = table.concat(partialLetters);
+	end;
+
+	return table.concat(allMobLetters, ' ');
+end;
+
+local validMobs = {
+    {
+        ['Name'] = 'Bandit Alchemist'
+    },
+
+    {
+        ['Name'] = 'Bandit Brute'
+    },
+
+    {
+        ['Name'] = 'Bandit Swordsman'
+    },
+
+    {
+        ['Name'] = 'Bandit Leader Morra'
+    },
+}
+
+do -- // Entity ESP
+        local function onNewMobAdded(mob, espConstructor)
+        if (not CollectionService:HasTag(mob, 'Mob')) then return end;
+
+        local code = [[
+            local mob = ...;
+            local FindFirstChild = game.FindFirstChild;
+            local FindFirstChildWhichIsA = game.FindFirstChildWhichIsA;
+
+            return setmetatable({
+                FindFirstChildWhichIsA = function(_, ...)
+                    return FindFirstChildWhichIsA(mob, ...);
+                end,
+            }, {
+                __index = function(_, p)
+                    if (p == 'Position') then
+                        local mobRoot = FindFirstChild(mob, 'HumanoidRootPart');
+                        return mobRoot and mobRoot.Position;
+                    end;
+                end,
+            })
+        ]];
+
+        local formattedName = formatMobName(mob.Name);
+        local mobEsp = espConstructor.new({code = code, vars = {mob}}, formattedName);
+
+        if (formattedName == 'Megalodaunt Legendary' and library.flags.artifactNotifier) then
+            ToastNotif.new({text = 'A red sharko has spawned, go check songseeker!'});
+        end;
+
+        local connection;
+        connection = mob:GetPropertyChangedSignal('Parent'):Connect(function()
+            if (not mob.Parent) then
+                connection:Disconnect();
+                mobEsp:Destroy();
+            end;
+        end);
+    end;
+
+    
+    makeESP({
+        sectionName = 'Mobs',
+        type = 'childAdded',
+        args = workspace.Mobs,
+        callback = onNewMobAdded,
+        onLoaded = function(section)
+            section:AddToggle({
+                text = 'Show Health',
+                flag = 'Mobs Show Health'
+            });
+            onLoaded = function(section)
+                return {list = makeList(Mobs, section)};
+            end,
+        end
+    });
+end;
