@@ -1493,6 +1493,10 @@ do -- // Setup ESP Data
             ['Name'] = '#HITBOX_SIMULATION';
         },
 
+         {
+            ['Name'] = 'Blue Orb';
+        },
+
         {
             ['Name'] = 'Hobo';
         }
@@ -1673,6 +1677,10 @@ do -- // ESP Functions
         if (mob.Name == 'generate') then
             if (FindFirstChild(Thrown, 'Chest1')) then
                 editedMobName = 'Hobo';
+            end;
+        elseif (mob.Name == 'HITBOX_SIMULATION#') then
+            if (FindFirstChild(mob, 'CaveDungeon') and FindFirstChild(mob, 'IsNPC') and FindFirstChild(mob, 'NoRagdoll')) then
+                editedMobName = 'Blue Orb';
             end;
         end;
 
