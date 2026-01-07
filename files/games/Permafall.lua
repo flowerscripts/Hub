@@ -1488,8 +1488,13 @@ do -- // Setup ESP Data
         {
             ['Name'] = 'Goblin';
         },
+
         {
             ['Name'] = '#HITBOX_SIMULATION';
+        },
+
+        {
+            ['Name'] = 'Hobo';
         }
     }
 end;
@@ -1666,7 +1671,7 @@ do -- // ESP Functions
         local editedMobName;
 
         if (mob.Name == 'generate') then
-            if (FindFirstChild(Throw, 'Chest1')) then
+            if (FindFirstChild(Thrown, 'Chest1')) then
                 editedMobName = 'Hobo';
             end;
         end;
