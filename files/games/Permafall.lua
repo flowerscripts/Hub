@@ -1677,8 +1677,8 @@ do -- // ESP Functions
         if (FindFirstChild(Players, mob.Name)) then return end;
 
         local editedMobName;
-        local displayObject = mob; -- Keep track of what to display
-        local healthObject = mob;  -- Keep track of where to get health from
+        local displayObject = mob;
+        local healthObject = mob; 
 
         if (mob.Name == 'generate') then
             if (FindFirstChild(Thrown, 'Chest1')) then
@@ -1687,7 +1687,6 @@ do -- // ESP Functions
         elseif (mob.Name == 'HITBOX_SIMULATION#') then
             if (FindFirstChild(mob, 'CaveDungeon') and FindFirstChild(mob, 'IsNPC') and FindFirstChild(mob, 'NoRagdoll')) then
                 editedMobName = 'Shock Orb';
-                -- Change display object but keep original for health
                 displayObject = FindFirstChild(Thrown, 'ShockOrb') or mob;
             end;
         end;
