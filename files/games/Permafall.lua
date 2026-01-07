@@ -1084,12 +1084,7 @@ do -- // Automation Functions
             if (hasSilver) then return end; 
         end;
 
-        if (isChestLoot and item:IsA('BasePart')) then
-            if (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('HumanoidRootPart')) then
-                LocalPlayer.Character.HumanoidRootPart.CFrame = item.CFrame;
-            end;
-        else
-            local touchInterest = item:FindFirstChildWhichIsA('TouchTransmitter');
+        local touchInterest = item:FindFirstChildWhichIsA('TouchTransmitter');
             if (touchInterest) then 
                 firetouchinterest(LocalPlayer.Character.HumanoidRootPart, item, 0);
             end;
