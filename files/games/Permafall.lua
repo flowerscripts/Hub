@@ -1066,7 +1066,7 @@ do -- // Automation Functions
         if (not item) then return end;
         
         if (isChestLoot) then
-            if (not item.Name:find('Chest') and item.Name ~= 'ChestGoldBar' and item.Name ~= 'ChestSilver') then return end;
+            if (not item.Name:find('Chest') and item.Name ~= 'ChestGoldBar' and item.Name ~= 'ChestCoin') then return end;
 
         elseif (isSilver) then
             if (not item.Name:find('Dropped_')) then return end;
