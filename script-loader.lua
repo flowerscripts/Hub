@@ -3,8 +3,7 @@ local TweenService = game:GetService('TweenService');
 local RunService = game:GetService('RunService');
 local CoreGui = game:GetService('CoreGui');
 
-local function setStatus() end;
-local function destroyUI() end;
+local setStatus, destroyUI;
 
 local oldRequest = clonefunction(request);
 
@@ -664,12 +663,11 @@ xpcall(function()
             sharedRequire('source.lua');
             setStatus('Script successfully loaded!', true);
          end, function(err)
-            logError(err .. ' ' .. crypt.base64.encode(scriptContent:sub(1, 50)));
-            setStatus('Failed to decrypt the script, please try to get the script again.' .. err, true);
+            warn('[Loader] Failed to launch script:\n' .. debug.traceback(tostring(err), 2));
+            setStatus(tostring(err), 'error');
         end);
     end);   
 end, function(err)
     logError(err);
     setStatus(err, true);
-
 end);
