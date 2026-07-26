@@ -398,31 +398,22 @@ do
     end;
 
     do -- // Download Assets
-        local assetsList = {'ModeratorJoin.mp3', 'ModeratorLeft.mp3'};
-        local assets = {};
+        -- local assetsList = {'ModeratorJoin.mp3', 'ModeratorLeft.mp3'};
+        -- local assets = {};
 
-        local apiEndpoint = USE_INSECURE_ENDPOINT and 'http://test.aztupscripts.xyz' or 'https://aztupscripts.xyz';
+        -- local apiEndpoint = USE_INSECURE_ENDPOINT and 'http://test.aztupscripts.xyz' or 'https://aztupscripts.xyz';
 
-        for i, v in next, assetsList do
-            if(not isfile(string.format('Aztup Hub V3/%s', v))) then
-                print('Downloading', v, '...');
-                writefile(string.format('Aztup Hub V3/%s', v), game:HttpGet(string.format('%s/%s', apiEndpoint, v)));
-            end;
+        -- for i, v in next, assetsList do
+        --     if(not isfile(string.format('Aztup Hub V3/%s', v))) then
+        --         print('Downloading', v, '...');
+        --         writefile(string.format('Aztup Hub V3/%s', v), game:HttpGet(string.format('%s/%s', apiEndpoint, v)));
+        --     end;
 
-            assets[v] = getasset(string.format('Aztup Hub V3/%s', v));
-        end;
+        --     assets[v] = getasset(string.format('Aztup Hub V3/%s', v));
+        -- end;
 
         function loadSound(soundName)
-            local sound = Instance.new('Sound');
-            sound.SoundId = assets[soundName];
-            sound.Volume = 1;
-            sound.Parent = game:GetService('CoreGui');
-
-            sound:Play();
-
-            task.delay(4, function()
-                sound:Destroy();
-            end);
+         
         end;
     end;
 
