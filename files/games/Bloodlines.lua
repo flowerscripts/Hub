@@ -52,10 +52,29 @@ local localPlayer = Players.LocalPlayer;
 local funcs = {};
 
 local maid = Maid.new();
-local remotes = ReplicatedStorage.Events;
-local dataEvent, dataFunction = remotes.DataEvent, remotes.DataFunction;
 
-local gameManager = require(ReplicatedStorage.GameManager);
+local remotes = ReplicatedStorage:WaitForChild('Events', 10);
+if (not remotes) then
+    return ToastNotif.new({text = 'Failed to load: ReplicatedStorage.Events is missing.'});
+end;
+
+local dataEvent, dataFunction = remotes:WaitForChild('DataEvent', 10), remotes:WaitForChild('DataFunction', 10);
+if (not dataEvent or not dataFunction) then
+    return ToastNotif.new({text = 'Failed to load: Events.DataEvent / Events.DataFunction is missing.'});
+end;
+
+local gameManagerModule = ReplicatedStorage:WaitForChild('GameManager', 10);
+local gameManagerLoaded, gameManager = false, nil;
+
+if (gameManagerModule) then
+    gameManagerLoaded, gameManager = pcall(require, gameManagerModule);
+end;
+
+if (not gameManagerLoaded) then
+    warn('[Bloodlines] Failed to load GameManager, purchasable items will be empty.', gameManager);
+    gameManager = {Items = {}};
+end;
+
 local localPlayerData = Utility:getPlayerData();
 
 local chakraPoints = {};
@@ -146,11 +165,20 @@ do
             });
         end;
 
-        ReplicatedStorage.DefaultChatSystemChatEvents.OnMessageDoneFiltering.OnClientEvent:Connect(function(messageData)
-            local player, message = Players:FindFirstChild(messageData.FromSpeaker), messageData.Message;
-            if (not player or not message) then return end;
+        task.spawn(function()
+            local chatEvents = ReplicatedStorage:WaitForChild('DefaultChatSystemChatEvents', 20);
+            local messageDoneFiltering = chatEvents and chatEvents:WaitForChild('OnMessageDoneFiltering', 20);
 
-            onPlayerChatted(player, message);
+            if (not messageDoneFiltering) then
+                return warn('[Bloodlines] Legacy chat events not found, chat logger will stay empty.');
+            end;
+
+            messageDoneFiltering.OnClientEvent:Connect(function(messageData)
+                local player, message = Players:FindFirstChild(messageData.FromSpeaker), messageData.Message;
+                if (not player or not message) then return end;
+
+                onPlayerChatted(player, message);
+            end);
         end);
 
         function funcs.chatLogger(state)
@@ -219,8 +247,14 @@ do
             end;
 
             maid.noRainLoop = task.spawn(function()
+                local raining = ReplicatedStorage:WaitForChild('Raining', 10);
+
+                if (not raining) then
+                    return warn('[Bloodlines] ReplicatedStorage.Raining not found, no rain disabled.');
+                end;
+
                 while true do
-                    ReplicatedStorage.Raining.Value = '';
+                    raining.Value = '';
                     task.wait();
                 end;
             end);
@@ -258,9 +292,19 @@ do
     do
         local chakaPointsInstances = {};
 
-        for _, chakraPoint in next, workspace.ChakraPoints:GetChildren() do
-            table.insert(chakraPoints, chakraPoint.PointName.Value);
-            chakaPointsInstances[chakraPoint.PointName.Value] = chakraPoint.Main.Position;
+        local chakraPointsFolder = workspace:WaitForChild('ChakraPoints', 10);
+
+        if (not chakraPointsFolder) then
+            warn('[Bloodlines] workspace.ChakraPoints not found, chakra point teleports disabled.');
+        end;
+
+        for _, chakraPoint in next, chakraPointsFolder and chakraPointsFolder:GetChildren() or {} do
+            local pointName = chakraPoint:FindFirstChild('PointName');
+            local main = chakraPoint:FindFirstChild('Main');
+            if (not pointName or not main) then continue end;
+
+            table.insert(chakraPoints, pointName.Value);
+            chakaPointsInstances[pointName.Value] = main.Position;
         end;
 
         function funcs.teleportToChakraPoint()
@@ -329,7 +373,13 @@ do
             task.spawn(onChildAdded, v);
         end;
 
-        for _, v in next, workspace.Locations:GetChildren() do
+        local locations = workspace:WaitForChild('Locations', 10);
+
+        if (not locations) then
+            warn('[Bloodlines] workspace.Locations not found, areas ESP disabled.');
+        end;
+
+        for _, v in next, locations and locations:GetChildren() or {} do
             areasESP.new(v, v.Name);
         end;
 
@@ -732,11 +782,17 @@ do
         end;
 
         library.OnLoad:Connect(function()
-            for _, v in next, ReplicatedStorage.Cooldowns:GetChildren() do
+            local cooldowns = ReplicatedStorage:WaitForChild('Cooldowns', 10);
+
+            if (not cooldowns) then
+                return warn('[Bloodlines] ReplicatedStorage.Cooldowns not found, chakra sense alert disabled.');
+            end;
+
+            for _, v in next, cooldowns:GetChildren() do
                 task.spawn(onChildAdded, v);
             end;
 
-            ReplicatedStorage.Cooldowns.ChildAdded:Connect(onChildAdded);
+            cooldowns.ChildAdded:Connect(onChildAdded);
         end);
     end;
 
