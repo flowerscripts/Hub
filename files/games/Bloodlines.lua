@@ -21,13 +21,23 @@ local fromHex = sharedRequire('utils/fromHex.lua');
 local toCamelCase = sharedRequire('utils/toCamelCase.lua');
 local Webhook = sharedRequire('utils/Webhook.lua');
 
+local cloneref = cloneref or function(object) return object end;
+
 -- Services
-local Players, ReplicatedStorage, RunService, Lighting, MemStorageService, TeleportService, HttpService = Services:Get('Players', 'ReplicatedStorage', 'RunService', 'Lighting', 'MemStorageService', 'TeleportService', 'HttpService');
+local Players, ReplicatedStorage, RunService, UserInputService, Lighting, MemStorageService, TeleportService, HttpService = Services:Get('Players', 'ReplicatedStorage', 'RunService', 'UserInputService', 'Lighting', 'MemStorageService', 'TeleportService', 'HttpService');
+
+Players = cloneref(Players);
+ReplicatedStorage = cloneref(ReplicatedStorage);
+RunService = cloneref(RunService);
+UserInputService = cloneref(UserInputService);
+Lighting = cloneref(Lighting);
+TeleportService = cloneref(TeleportService);
+
 local MAIN_PLACE_ID = 10266164381;
 
 if (game.PlaceId ~= MAIN_PLACE_ID) then
     return ToastNotif.new({text = 'Script will not run in lobby.'});
-end
+end;
 
 -- UI Init
 local column1, column2 = unpack(library.columns);
@@ -39,7 +49,9 @@ local teleportCheats = column2:AddSection('Teleport Cheats');
 local miscCheats = column2:AddSection('Misc Cheats');
 
 -- Utility Functions
-local IsA = game.IsA;
+local IsA = clonefunction(game.IsA);
+local FindFirstChild = clonefunction(game.FindFirstChild);
+local FindFirstChildWhichIsA = clonefunction(game.FindFirstChildWhichIsA);
 
 -- Variables
 local chatLogger = TextLogger.new({
@@ -52,6 +64,10 @@ local localPlayer = Players.LocalPlayer;
 local funcs = {};
 
 local maid = Maid.new();
+
+library.unloadMaid:GiveTask(function()
+    maid:DoCleaning();
+end);
 
 local remotes = ReplicatedStorage:WaitForChild('Events', 10);
 if (not remotes) then
@@ -70,7 +86,7 @@ if (gameManagerModule) then
     gameManagerLoaded, gameManager = pcall(require, gameManagerModule);
 end;
 
-if (not gameManagerLoaded) then
+if (not gameManagerLoaded or typeof(gameManager) ~= 'table') then
     warn('[Bloodlines] Failed to load GameManager, purchasable items will be empty.', gameManager);
     gameManager = {Items = {}};
 end;
@@ -90,23 +106,19 @@ do
     do
         local oldNamecall;
 
-        local function fireServerHook(remote, action, ...)
-            if (remote == dataEvent and string.lower(action) == 'banme') then
-                return warn('No No No');
-            end;
-
-            return oldNamecall(remote, action, ...);
-        end;
-
         oldNamecall = hookmetamethod(game, '__namecall', function(self, ...)
             local method = getnamecallmethod();
 
-            if ((method == 'fireServer' or method == 'FireServer') and IsA(self, 'RemoteEvent') and self == dataEvent) then
-                return fireServerHook(self, ...);
-            elseif (method == 'FindFirstChild') then
-                local args = {...};
-                if (args[1] == 'NegateFall' and library.flags.noFallDamage) then
-                    print('no fall damage haha');
+            if (self == dataEvent and (method == 'FireServer' or method == 'fireServer')) then
+                local action = ...;
+
+                if (typeof(action) == 'string' and string.lower(action) == 'banme') then
+                    return warn('[Bloodlines] Blocked a BanMe remote call.');
+                end;
+            elseif (method == 'FindFirstChild' and library.flags.noFallDamage and not checkcaller()) then
+                local childName = ...;
+
+                if (childName == 'NegateFall') then
                     return true;
                 end;
             end;
@@ -120,7 +132,7 @@ do
         local KILL_BRICKS_NAMES = {'LavarossaVoid', 'Void'};
         local killBricks = {};
 
-        local function onChildAdded(object)
+        local function onDescendantAdded(object)
             if (not table.find(KILL_BRICKS_NAMES, object.Name)) then return end;
 
             table.insert(killBricks, {
@@ -135,6 +147,8 @@ do
 
         function funcs.noKillBricks(state)
             for _, killBrick in next, killBricks do
+                if (not killBrick.part) then continue end;
+
                 killBrick.part.Parent = not state and killBrick.oldParent or nil;
             end;
         end;
@@ -142,11 +156,11 @@ do
         library.OnLoad:Connect(function()
             for _, v in next, workspace:GetDescendants() do
                 if (table.find(KILL_BRICKS_NAMES, v.Name)) then
-                    task.spawn(onChildAdded, v);
+                    task.spawn(onDescendantAdded, v);
                 end;
             end;
 
-            workspace.DescendantAdded:Connect(onChildAdded);
+            maid.killBricksListener = workspace.DescendantAdded:Connect(onDescendantAdded);
         end);
     end;
 
@@ -159,7 +173,7 @@ do
 
             message = ('[%s] [%s] [%s] %s'):format(timeText, playerName, playerIngName, message);
 
-            local textData = chatLogger:AddText({
+            chatLogger:AddText({
                 text = message,
                 player = player
             });
@@ -173,7 +187,7 @@ do
                 return warn('[Bloodlines] Legacy chat events not found, chat logger will stay empty.');
             end;
 
-            messageDoneFiltering.OnClientEvent:Connect(function(messageData)
+            maid.chatLoggerListener = messageDoneFiltering.OnClientEvent:Connect(function(messageData)
                 local player, message = Players:FindFirstChild(messageData.FromSpeaker), messageData.Message;
                 if (not player or not message) then return end;
 
@@ -212,12 +226,20 @@ do
     do
         dataEvent.OnClientEvent:Connect(function(eventType, ...)
             if (eventType == 'InDanger') then
+                if (not inDanger and library.flags.dangerNotifier) then
+                    ToastNotif.new({text = 'You are now in danger.', duration = 5});
+                end;
+
                 inDanger = true;
             elseif (eventType == 'OutOfDanger') then
+                if (inDanger and library.flags.dangerNotifier) then
+                    ToastNotif.new({text = 'You are no longer in danger.', duration = 5});
+                end;
+
                 inDanger = false;
             end;
         end);
-    end
+    end;
 
     -- Danger Checks Features (Reset Character, Instant Log)
     do
@@ -241,8 +263,13 @@ do
 
     -- Visuals Features
     do
+        local oldFogEnd = Lighting.FogEnd;
+        local oldBrightness = Lighting.Brightness;
+        local oldClockTime = Lighting.ClockTime;
+
         function funcs.noRain(state)
             if (not state) then
+                maid.noRainLoop = nil;
                 return;
             end;
 
@@ -260,12 +287,9 @@ do
             end);
         end;
 
-        local oldvalue = Lighting.FogEnd;
-        local oldBrightness = Lighting.Brightness;
-
         function funcs.noFog(state)
             if (not state) then
-                Lighting.FogEnd = oldvalue;
+                Lighting.FogEnd = oldFogEnd;
                 maid.noFog = nil;
                 return;
             end;
@@ -286,11 +310,37 @@ do
                 Lighting.Brightness = library.flags.brightnessLevel;
             end);
         end;
+
+        local clockTimes = {
+            Morning = 6.3,
+            Afternoon = 14,
+            Evening = 18,
+            Night = 0
+        };
+
+        function funcs.timeChanger(state)
+            if (not state) then
+                Lighting.ClockTime = oldClockTime;
+                maid.timeChanger = nil;
+                return;
+            end;
+
+            maid.timeChanger = RunService.RenderStepped:Connect(function()
+                Lighting.ClockTime = clockTimes[library.flags.timeOfDay] or oldClockTime;
+            end);
+        end;
     end;
+
+    -- ESP Objects
+    local npcsESP = createBaseESP('npcs', {});
+    local mobsESP = createBaseESP('mobs', {});
+    local areasESP = createBaseESP('areas', {});
+    local itemsESP = createBaseESP('items', {});
+    local chakraPointsESP = createBaseESP('chakraPoints', {});
 
     -- Teleports
     do
-        local chakaPointsInstances = {};
+        local chakraPointsInstances = {};
 
         local chakraPointsFolder = workspace:WaitForChild('ChakraPoints', 10);
 
@@ -299,19 +349,24 @@ do
         end;
 
         for _, chakraPoint in next, chakraPointsFolder and chakraPointsFolder:GetChildren() or {} do
-            local pointName = chakraPoint:FindFirstChild('PointName');
-            local main = chakraPoint:FindFirstChild('Main');
+            local pointName = FindFirstChild(chakraPoint, 'PointName');
+            local main = FindFirstChild(chakraPoint, 'Main');
             if (not pointName or not main) then continue end;
 
             table.insert(chakraPoints, pointName.Value);
-            chakaPointsInstances[pointName.Value] = main.Position;
+            chakraPointsInstances[pointName.Value] = main.Position;
+
+            chakraPointsESP.new(main, pointName.Value);
         end;
+
+        table.sort(chakraPoints);
 
         function funcs.teleportToChakraPoint()
             local rootPart = localPlayerData.rootPart;
             if (not rootPart) then return end;
 
-            local pos = chakaPointsInstances[library.flags.chakraPoint];
+            local pos = chakraPointsInstances[library.flags.chakraPoint];
+            if (not pos) then return ToastNotif.new({text = 'That chakra point no longer exists.'}) end;
 
             rootPart.CFrame = CFrame.new(pos - Vector3.new(0, 0, 5), pos);
         end;
@@ -327,52 +382,8 @@ do
         end;
     end;
 
-    -- NPCs, Mobs features
+    -- Areas
     do
-        local npcsList = {};
-        local npcsESP = createBaseESP('npcs', {});
-        local mobsESP = createBaseESP('mobs', {});
-        local areasESP = createBaseESP('areas', {});
-
-        local function onChildAdded(object)
-            if (not IsA(object, 'Model')) then return end;
-
-            local npcValue = object:WaitForChild('NPC', 10);
-            if (not npcValue) then return end;
-
-            local rootPart = object:FindFirstChild('HumanoidRootPart') or object:FindFirstChild('Main');
-
-            if (npcValue.Value == 'Dialog') then
-                table.insert(npcs, object.Name);
-                npcsList[object.Name] = object;
-
-                local npcESP;
-                if (rootPart) then
-                    npcESP = npcsESP.new(rootPart, object.Name);
-                end;
-
-                object.Destroying:Connect(function()
-                    table.remove(npcs, table.find(npcs, object.Name));
-                    npcsList[object.Name] = nil;
-                    npcESP:Destroy();
-                end);
-            elseif (npcValue.Value == 'Combat') then
-                local mobESP;
-
-                if (rootPart) then
-                    mobESP = mobsESP.new(rootPart, object.Name);
-
-                    object.Destroying:Connect(function()
-                        mobESP:Destroy();
-                    end);
-                end;
-            end;
-        end;
-
-        for _, v in next, workspace:GetChildren() do
-            task.spawn(onChildAdded, v);
-        end;
-
         local locations = workspace:WaitForChild('Locations', 10);
 
         if (not locations) then
@@ -382,26 +393,165 @@ do
         for _, v in next, locations and locations:GetChildren() or {} do
             areasESP.new(v, v.Name);
         end;
+    end;
 
-        workspace.ChildAdded:Connect(onChildAdded);
+    -- Workspace Entities (NPCs, Mobs, Pickupables, Attachables)
+    do
+        local npcsList = {};
+        local pickupList = {};
+        local entities = {};
+
+        local function onNpcAdded(object)
+            local npcValue = object:WaitForChild('NPC', 10);
+            if (not npcValue or not object.Parent) then return end;
+
+            local rootPart = FindFirstChild(object, 'HumanoidRootPart') or FindFirstChild(object, 'Main');
+            if (not rootPart) then return end;
+
+            if (npcValue.Value == 'Dialog') then
+                table.insert(npcs, object.Name);
+                npcsList[object.Name] = object;
+
+                local npcESP = npcsESP.new(rootPart, object.Name);
+
+                object.Destroying:Connect(function()
+                    table.remove(npcs, table.find(npcs, object.Name));
+                    npcsList[object.Name] = nil;
+                    npcESP:Destroy();
+                end);
+            elseif (npcValue.Value == 'Combat') then
+                local mobESP = mobsESP.new(rootPart, object.Name);
+
+                object.Destroying:Connect(function()
+                    mobESP:Destroy();
+                end);
+            end;
+        end;
+
+        local function onPickupableAdded(object)
+            local pickupable = object:WaitForChild('Pickupable', 10);
+            if (not pickupable) then return end;
+
+            local id = object:WaitForChild('ID', 10);
+            if (not id or not object.Parent) then return end;
+
+            pickupList[object] = {
+                id = id,
+                lastPickupAt = 0
+            };
+
+            local itemESP = itemsESP.new(object, object.Name);
+
+            object.Destroying:Connect(function()
+                pickupList[object] = nil;
+                itemESP:Destroy();
+            end);
+        end;
+
+        local function onEntityAdded(object)
+            if (object == localPlayer.Character) then return end;
+
+            local humanoid = object:WaitForChild('Humanoid', 10);
+            if (not humanoid) then return end;
+
+            local rootPart = object:WaitForChild('HumanoidRootPart', 10);
+            if (not rootPart or not object.Parent) then return end;
+
+            -- Dialog NPCs are useless to attach to, they never move
+            local npcValue = FindFirstChild(object, 'NPC');
+            if (npcValue and npcValue.Value == 'Dialog') then return end;
+
+            table.insert(entities, rootPart);
+
+            object.Destroying:Connect(function()
+                table.remove(entities, table.find(entities, rootPart));
+            end);
+        end;
+
+        local function onWorkspaceChildAdded(object)
+            if (IsA(object, 'BasePart')) then
+                return onPickupableAdded(object);
+            end;
+
+            if (not IsA(object, 'Model')) then return end;
+
+            task.spawn(onNpcAdded, object);
+            task.spawn(onEntityAdded, object);
+        end;
+
+        maid.workspaceListener = Utility.listenToChildAdded(workspace, onWorkspaceChildAdded);
 
         function funcs.teleportToNPC()
             local npcName = library.flags.npcTeleport;
             local npc = npcsList[npcName];
-            if (not npc) then return end;
+            if (not npc) then return ToastNotif.new({text = 'That NPC is not loaded in this server.'}) end;
 
             local rootPart = localPlayerData.rootPart;
             if (not rootPart) then return end;
 
-            local main = npc.PrimaryPart or npc:FindFirstChild('Main') or npc:FindFirstChildWhichIsA('BasePart', true);
+            local main = npc.PrimaryPart or FindFirstChild(npc, 'Main') or FindFirstChildWhichIsA(npc, 'BasePart', true);
+            if (not main) then return end;
 
             rootPart.CFrame = CFrame.new(main.Position + Vector3.new(0, 0, -5), main.Position);
         end;
 
+        function funcs.autoPickup(state)
+            if (not state) then
+                maid.autoPickup = nil;
+                return;
+            end;
+
+            local PICKUP_COOLDOWN = 1;
+            local lastRanAt = 0;
+
+            maid.autoPickup = RunService.Heartbeat:Connect(function()
+                local rootPart = localPlayerData.rootPart;
+                if (not rootPart or tick() - lastRanAt < 0.1) then return end;
+                lastRanAt = tick();
+
+                local myPosition = rootPart.Position;
+                local maxDistance = library.flags.autoPickupRange;
+
+                for object, data in next, pickupList do
+                    if (tick() - data.lastPickupAt < PICKUP_COOLDOWN) then continue end;
+                    if ((myPosition - object.Position).Magnitude > maxDistance) then continue end;
+
+                    data.lastPickupAt = tick();
+                    dataEvent:FireServer('PickUp', data.id.Value);
+                end;
+            end);
+        end;
+
+        function funcs.attachToBack()
+            local myRootPart = localPlayerData.rootPart;
+            if (not myRootPart) then return end;
+
+            local myPosition = myRootPart.Position;
+            local last, target = math.huge, nil;
+
+            for _, part in next, entities do
+                local dist = (myPosition - part.Position).Magnitude;
+
+                if (dist < last) then
+                    last = dist;
+                    target = part;
+                end;
+            end;
+
+            if (target) then
+                myRootPart.CFrame = target.CFrame * CFrame.new(0, 0, 2);
+            end;
+        end;
+    end;
+
+    -- ESP UI
+    do
         function Utility:renderOverload(data)
             local mobsSection = data.column1:AddSection('Mobs');
+            local itemsSection = data.column1:AddSection('Items');
             local npcsSection = data.column2:AddSection('NPCs');
             local areasSection = data.column2:AddSection('Areas');
+            local chakraSection = data.column2:AddSection('Chakra Points');
 
             local function makeFor(section, flagName, espObject)
                 section:AddToggle({
@@ -439,11 +589,34 @@ do
             makeFor(npcsSection, 'Npcs', npcsESP);
             makeFor(mobsSection, 'Mobs', mobsESP);
             makeFor(areasSection, 'Areas', areasESP);
+            makeFor(itemsSection, 'Items', itemsESP);
+            makeFor(chakraSection, 'Chakra Points', chakraPointsESP);
 
             mobsSection:AddToggle({
                 text = 'Show Health',
                 flag = 'Mobs Show Health'
             });
+        end;
+    end;
+
+    -- Player ESP Plugin
+    do
+        function EntityESP:Plugin()
+            local characterNameText = '';
+
+            if (library.flags.showCharacterName) then
+                local player = self._player;
+                local characterName = player and player:GetAttribute('CharacterName');
+
+                if (characterName) then
+                    characterNameText = ` [{characterName}]`;
+                end;
+            end;
+
+            return {
+                text = characterNameText,
+                playerName = self._playerName
+            };
         end;
     end;
 
@@ -463,46 +636,46 @@ do
         -- end;
 
         function loadSound(soundName)
-         
+
         end;
     end;
 
     -- Add Purchasable Items
     do
-        for itemName, item in next, gameManager.Items do
-            if (item.Buyabble) then
+        for itemName, item in next, gameManager.Items or {} do
+            if (typeof(item) == 'table' and item.Buyabble) then
                 table.insert(purchasableItems, itemName);
             end;
         end;
+
+        table.sort(purchasableItems);
     end;
 
     -- Mod Detector
     do
+        local GROUP_ID = 7450839;
+
         Utility.onPlayerAdded:Connect(function(player)
-            while true do
-                local suc, rank = pcall(function() return player:GetRankInGroup(7450839) end);
-                if (not suc) then continue end;
+            local success, rank = pcall(originalFunctions.getRankInGroup, player, GROUP_ID);
+            if (not success or rank == 0) then return end;
 
-                if (rank ~= 0) then
-                    ToastNotif.new({
-                        text = string.format('Moderator detected [%s]', player.Name)
-                    });
+            ToastNotif.new({
+                text = string.format('Moderator detected [%s]', player.Name)
+            });
 
-                    if (library.flags.moderatorSoundAlert) then
-                        loadSound('ModeratorJoin.mp3');
-                    end;
-
-                    player.Destroying:Connect(function()
-                        ToastNotif.new({
-                            text = string.format('Moderator left [%s]', player.Name),
-                        });
-
-                        loadSound('ModeratorLeft.mp3');
-                    end);
-                end;
-
-                break;
+            if (library.flags.moderatorSoundAlert) then
+                loadSound('ModeratorJoin.mp3');
             end;
+
+            player.Destroying:Connect(function()
+                ToastNotif.new({
+                    text = string.format('Moderator left [%s]', player.Name)
+                });
+
+                if (library.flags.moderatorSoundAlert) then
+                    loadSound('ModeratorLeft.mp3');
+                end;
+            end);
         end);
     end;
 
@@ -517,10 +690,10 @@ do
             local lastSpectatingObject;
 
             local function spectate(player, obj)
-                local playerData = Utility:getPlayerData(player);
-                if (not playerData) then return end;
+                local targetData = Utility:getPlayerData(player);
+                if (not targetData) then return end;
 
-                local playerHumanoid = playerData.humanoid;
+                local playerHumanoid = targetData.humanoid;
 
                 if (not player or lastSpectating == player) then
                     if (lastSpectatingObject) then
@@ -556,210 +729,135 @@ do
                 if (not playerName) then return end;
 
                 obj.InputBegan:Connect(function(inputObject)
-                    if (inputObject.UserInputType == Enum.UserInputType.MouseButton2) then
-                        local humanoid = localPlayerData.humanoid;
-                        if (not humanoid) then return spectate() end;
+                    if (inputObject.UserInputType ~= Enum.UserInputType.MouseButton2) then return end;
 
-                        local player = Players:FindFirstChild(playerName.Value);
-                        if (not player) then return spectate() end;
+                    local humanoid = localPlayerData.humanoid;
+                    if (not humanoid) then return spectate() end;
 
-                        -- Attempt to spectate player
-                        spectate(player, obj);
-                    end;
+                    local player = Players:FindFirstChild(playerName.Value);
+                    if (not player) then return spectate() end;
+
+                    -- Attempt to spectate player
+                    spectate(player, obj);
                 end);
             end;
 
-            for _, v in next, playerList:GetChildren() do
-                task.spawn(onChildAdded, v);
-            end;
-
-            playerList.ChildAdded:Connect(onChildAdded);
+            Utility.listenToChildAdded(playerList, onChildAdded);
         end);
     end;
 
-    -- Auto Pickup
+    -- Server Hopping
     do
-        local pickupList = {};
+        local SERVER_LIST_KEY = 'thunderStormServerList';
 
-        local function onChildAdded(obj)
-            if (not IsA(obj, 'BasePart')) then return end;
+        local function fetchServerList()
+            local serverListData = {};
+            local cursor = '';
+            local attempts = 0;
 
-            local pickupable = obj:WaitForChild('Pickupable', 10);
-            if (not pickupable) then return end;
+            while (true) do
+                local success, serverList = pcall(request, {
+                    Url = string.format('https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Desc&limit=100&cursor=%s', MAIN_PLACE_ID, cursor)
+                });
 
-            local id = obj:WaitForChild('ID', 10);
-            if (not id) then return end;
+                if (not success or not serverList.Success) then
+                    attempts += 1;
+                    if (attempts > 5) then break end;
 
-            local pos = obj.Position;
-            pickupList[pos] = obj;
+                    task.wait(2);
+                    continue;
+                end;
 
-            obj.Destroying:Connect(function()
-                pickupList[pos] = nil;
-            end);
+                local decoded;
+                success, decoded = pcall(HttpService.JSONDecode, HttpService, serverList.Body);
+                if (not success or typeof(decoded) ~= 'table') then break end;
+
+                for _, server in next, decoded.data or {} do
+                    if (server.id == game.JobId) then continue end;
+
+                    table.insert(serverListData, server.id);
+                end;
+
+                if (not decoded.nextPageCursor or not decoded.data) then break end;
+
+                cursor = decoded.nextPageCursor;
+                task.wait(0.5);
+            end;
+
+            return serverListData;
         end;
 
-        for _, child in next, workspace:GetChildren() do
-            task.spawn(onChildAdded, child);
+        -- Server list is cached across teleports so we don't hop back into servers we already tried
+        local function getServerList()
+            local cached = MemStorageService:HasItem(SERVER_LIST_KEY) and MemStorageService:GetItem(SERVER_LIST_KEY);
+
+            if (cached) then
+                local success, decoded = pcall(HttpService.JSONDecode, HttpService, cached);
+                if (success and typeof(decoded) == 'table' and #decoded > 0) then
+                    return decoded;
+                end;
+            end;
+
+            local serverList = fetchServerList();
+            MemStorageService:SetItem(SERVER_LIST_KEY, HttpService:JSONEncode(serverList));
+
+            return serverList;
         end;
 
-        workspace.ChildAdded:Connect(onChildAdded);
+        local function saveServerList(serverList)
+            MemStorageService:SetItem(SERVER_LIST_KEY, HttpService:JSONEncode(serverList));
+        end;
 
-        function funcs.autoPickup(toggle)
-            if (not toggle) then
-                maid.autoPickup = nil;
+        function funcs.serverHop()
+            local serverList = getServerList();
+
+            if (#serverList == 0) then
+                return ToastNotif.new({text = 'Could not find any other server to hop to.'});
+            end;
+
+            local serverId = table.remove(serverList, math.random(1, #serverList));
+            saveServerList(serverList);
+
+            ToastNotif.new({text = 'Hopping to a new server...'});
+            dataEvent:FireServer('ServerTeleport', serverId);
+        end;
+
+        function funcs.findThunderstormServer(state)
+            if (not state) then
+                maid.thunderstormFinder = nil;
                 return;
             end;
 
-            local lastRanAt = 0;
+            maid.thunderstormFinder = task.spawn(function()
+                ToastNotif.new({text = 'Thunderstorm Server Finder is running!'});
 
-            maid.autoPickup = RunService.Heartbeat:Connect(function()
-                local rootPart = localPlayerData.rootPart;
-                if (not rootPart or tick() - lastRanAt < 0.1) then return end;
-                lastRanAt = tick();
+                local thunderStorm = workspace:WaitForChild('Thunderstorm', 5);
 
-                local myPosition = rootPart.Position;
-
-                for pos, obj in next, pickupList do
-                    local distance = (myPosition - pos).Magnitude;
-                    if (distance < 50) then
-                        print('pick it up');
-                        dataEvent:FireServer('PickUp', obj.ID.Value);
-                    end;
+                if (thunderStorm) then
+                    return ToastNotif.new({text = 'Found thunderstorm in this server!'});
                 end;
-            end);
-        end;
-    end;
 
-    -- Attach To Back
-    do
-        local entities = {};
+                ToastNotif.new({text = 'No thunderstorm was found on this server, finding new server...'});
 
-        local function onChildAdded(obj)
-            task.wait();
+                local serverList = getServerList();
 
-            if (not IsA(obj, 'Model')) then return end;
-            if (obj == localPlayer.Character) then return end;
+                while (library.flags.thunderstormServerFinder) do
+                    if (#serverList == 0) then
+                        serverList = fetchServerList();
 
-            local humanoid = obj:WaitForChild('Humanoid', 10);
-            if (not humanoid) then return end;
-
-            local rootPart = obj:WaitForChild('HumanoidRootPart', 10);
-            if (not rootPart or not obj.Parent) then return end;
-
-            local connection;
-
-            task.spawn(function()
-                local npc = obj:WaitForChild('Npc', 10);
-
-                if (npc and npc.Value == 'Dialog') then
-                    if (table.find(entities, rootPart)) then
-                        table.remove(entities, table.find(entities, rootPart));
-                        connection:Disconnect();
-                    end;
-                end;
-            end);
-
-            connection = obj.Destroying:Connect(function()
-                table.remove(entities, table.find(entities, rootPart));
-            end);
-
-            table.insert(entities, rootPart);
-        end;
-
-        for _, child in next, workspace:GetChildren() do
-            task.spawn(onChildAdded, child);
-        end;
-
-        workspace.ChildAdded:Connect(onChildAdded);
-
-        function funcs.attachToBack()
-            local myRootPart = localPlayerData.rootPart;
-            if (not myRootPart) then return end;
-
-            local myPosition = myRootPart.Position;
-            local last, target = math.huge, nil;
-
-            for _, part in next, entities do
-                local dist = (myPosition - part.Position).Magnitude;
-
-                if (dist < last) then
-                    last = dist;
-                    target = part;
-                end;
-            end;
-
-            if (target) then
-                myRootPart.CFrame = target.CFrame * CFrame.new(0, 0, 2);
-            end;
-        end;
-    end;
-
-    -- Thunderstorm Server Finder
-    do
-        function funcs.findThunderstormServer(state)
-            if (not state) then return end;
-
-            ToastNotif.new({
-                text = 'Thunderstorm Server Finder is running!',
-            });
-
-            local thunderStorm = workspace:WaitForChild('Thunderstorm', 5);
-
-            if (thunderStorm) then
-                return ToastNotif.new({
-                    text = 'Found thunderstorm in this server!'
-                });
-            else
-                ToastNotif.new({
-                    text = 'No thunderstorm was found on this server, finding new server...'
-                });
-            end;
-
-            local oldServerList = MemStorageService:HasItem('thunderStormServerList') and MemStorageService:GetItem('thunderStormServerList');
-
-            if (oldServerList) then
-                oldServerList = HttpService:JSONDecode(oldServerList);
-            end;
-
-            if (not oldServerList or #oldServerList == 0) then
-                -- Fetch new server if no server of if list is empty
-
-                local serverListData = {};
-                local cursor = '';
-
-                while (true) do
-                    local serverList = request({
-                        Url = string.format('https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Desc&limit=100&cursor=%s', MAIN_PLACE_ID, cursor)
-                    });
-
-                    table.foreach(serverList, warn);
-
-                    if (not serverList.Success) then continue end;
-                    serverList = HttpService:JSONDecode(serverList.Body);
-
-                    for _, server in next, serverList.data or {} do
-                        -- if (server.playing < server.maxPlayers) then
-                            table.insert(serverListData, server.id);
-                        -- end;
+                        if (#serverList == 0) then
+                            ToastNotif.new({text = 'Ran out of servers to hop to, stopping.'});
+                            break;
+                        end;
                     end;
 
-                    if (not serverList.nextPageCursor or not serverList.data) then break end;
+                    local serverId = table.remove(serverList, math.random(1, #serverList));
+                    saveServerList(serverList);
 
-                    cursor = serverList.nextPageCursor;
+                    dataEvent:FireServer('ServerTeleport', serverId);
+                    task.wait(15);
                 end;
-
-                print('Got', #serverListData);
-                MemStorageService:SetItem('thunderStormServerList', HttpService:JSONEncode(serverListData));
-            end;
-
-            local serverList = HttpService:JSONDecode(MemStorageService:GetItem('thunderStormServerList'));
-
-            while (library.flags.thunderstormServerFinder) do
-                local serverId = table.remove(serverList, math.random(1, #serverList));
-                dataEvent:FireServer('ServerTeleport', serverId);
-                -- TeleportService:TeleportToPlaceInstance(MAIN_PLACE_ID, serverId);
-                task.wait(15);
-            end;
+            end);
         end;
     end;
 
@@ -770,15 +868,11 @@ do
                 if (obj2.Name == 'Chakra Sense' and library.flags.chakraSenseNotifier) then
                     ToastNotif.new({
                         text = string.format('%s has chakra sense', obj.Name)
-                    })
+                    });
                 end;
             end;
 
-            for _, v in next, obj:GetChildren() do
-                task.spawn(onChildAdded2, v);
-            end;
-
-            obj.ChildAdded:Connect(onChildAdded2);
+            Utility.listenToChildAdded(obj, onChildAdded2);
         end;
 
         library.OnLoad:Connect(function()
@@ -788,11 +882,7 @@ do
                 return warn('[Bloodlines] ReplicatedStorage.Cooldowns not found, chakra sense alert disabled.');
             end;
 
-            for _, v in next, cooldowns:GetChildren() do
-                task.spawn(onChildAdded, v);
-            end;
-
-            cooldowns.ChildAdded:Connect(onChildAdded);
+            maid.cooldownsListener = Utility.listenToChildAdded(cooldowns, onChildAdded);
         end);
     end;
 
@@ -803,8 +893,11 @@ do
             return;
         end;
 
-        maid.flyBodyVelocity = Instance.new('BodyVelocity');
-        maid.flyBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge);
+        local bodyVelocity = Instance.new('BodyVelocity');
+        bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge);
+        bodyVelocity.Velocity = Vector3.zero;
+
+        maid.flyBodyVelocity = bodyVelocity;
 
         maid.flyStepped = RunService.Stepped:Connect(function()
             local camera = workspace.CurrentCamera;
@@ -813,14 +906,34 @@ do
             local rootPart = localPlayerData.rootPart;
             if (not rootPart) then return end;
 
+            -- The character respawning drops our body mover, so re-parent it when that happens
+            if (bodyVelocity.Parent ~= rootPart) then
+                bodyVelocity.Parent = rootPart;
+            end;
+
             local rawMoveVector = ControlModule:GetMoveVector();
-            local cameraMoveVector = camera.CFrame:VectorToWorldSpace(rawMoveVector);
+            local moveVector = camera.CFrame:VectorToWorldSpace(rawMoveVector);
 
-            maid.flyBodyVelocity = maid.flyBodyVelocity and maid.flyBodyVelocity.Parent ~= nil and maid.flyBodyVelocity or Instance.new('BodyVelocity');
-            maid.flyBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge);
+            if (library.flags.flyVertical) then
+                local upValue = (UserInputService:IsKeyDown(Enum.KeyCode.Space) and 1 or 0) + (UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and -1 or 0);
+                moveVector = Vector3.new(moveVector.X, upValue, moveVector.Z);
+            end;
 
-            maid.flyBodyVelocity.Parent = rootPart;
-            maid.flyBodyVelocity.Velocity = cameraMoveVector * library.flags.flySpeed;
+            bodyVelocity.Velocity = moveVector * library.flags.flySpeed;
+        end);
+    end;
+
+    function funcs.infiniteJump(state)
+        if (not state) then
+            maid.infiniteJump = nil;
+            return;
+        end;
+
+        maid.infiniteJump = UserInputService.JumpRequest:Connect(function()
+            local humanoid = localPlayerData.humanoid;
+            if (not humanoid) then return end;
+
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping);
         end);
     end;
 
@@ -845,12 +958,14 @@ do
         end;
 
         maid.noClipStep = RunService.Stepped:Connect(function()
-            local character = localPlayerData.character;
-            if (not character) then return end;
+            -- Utility keeps localPlayerData.parts up to date, so we don't have to walk the character every frame
+            local parts = localPlayerData.parts;
+            if (not parts) then return end;
+
             debug.profilebegin('NoClip');
 
-            for _, part in next,character:GetDescendants() do
-                if (IsA(part, 'BasePart')) then
+            for _, part in next, parts do
+                if (part.CanCollide) then
                     part.CanCollide = false;
                 end;
             end;
@@ -859,60 +974,23 @@ do
         end);
     end;
 
-    function funcs.timeChanger(state)
-        if (not state) then
-            maid.timeChanger = nil;
-            return;
-        end;
-
-        local clockTimes = {
-            Morning = 6.3,
-            Afternoon = 14,
-            Evening = 18,
-            Night = 0
-        };
-
-        maid.timeChanger = RunService.RenderStepped:Connect(function()
-            Lighting.ClockTime = clockTimes[library.flags.timeOfDay];
-        end);
-    end;
-
-    function funcs.rollbackData()
-        local function doRollback()
-            ToastNotif.new({text = 'Working, please wait...'});
-
-            originalFunctions.fireServer(dataEvent, unpack({
-                [1] = "UpdateSettings",
-                [2] = "Icon",
-                [3] = "High",
-                [4] = "On",
-                [5] = "On" .. string.rep('\0', 10e6),
-                [6] = "Off",
-                [7] = "On",
-                [8] = "On"
-            }))
-
-            repeat
-                task.wait(1);
-            until #originalFunctions.invokeServer(dataFunction, 'GetData').Footsteps > 20;
-
-            ToastNotif.new({text = 'Dataloss set anything after this point won\'t save'});
-        end;
-
-        if (library:ShowConfirm(inDanger and 'You are in danger. Are you sure you want do this right now? Rollback data does not work 100% of the time' or 'Are you sure you want to do to this')) then
-            doRollback();
-        end;
-    end;
-
     function funcs.removeFF()
         local character = localPlayerData.character;
-        if (not character or not character:FindFirstChildWhichIsA('ForceField')) then return end;
+        if (not character) then return end;
 
-        character:FindFirstChildWhichIsA('ForceField'):Destroy();
+        local forceField = FindFirstChildWhichIsA(character, 'ForceField');
+        if (not forceField) then return end;
+
+        forceField:Destroy();
     end;
 
     function funcs.giveItem()
         local itemName = library.flags.itemName;
+        if (not itemName or itemName == '') then return ToastNotif.new({text = 'Select an item first.'}) end;
+
+        if (not library:ShowConfirm(string.format('Purchase <font color="rgb(255, 0, 0)">%s</font>? This fires a server remote and is detectable.', itemName))) then
+            return;
+        end;
 
         originalFunctions.invokeServer(dataFunction, 'Pay', 1, itemName, 1);
     end;
@@ -921,6 +999,7 @@ end;
 -- Add Features To UI
 localCheats:AddToggle({text = 'Moderator Sound Alert'});
 localCheats:AddToggle({text = 'Chakra Sense Notifier', state = true});
+localCheats:AddToggle({text = 'Danger Notifier', state = true});
 
 localCheats:AddToggle({
     text = 'Fly',
@@ -932,6 +1011,9 @@ localCheats:AddToggle({
     max = 500
 });
 
+localCheats:AddToggle({text = 'Fly Vertical', state = true, tip = 'Space to go up, Left Shift to go down.'});
+localCheats:AddToggle({text = 'Infinite Jump', callback = funcs.infiniteJump});
+
 localCheats:AddToggle({
     text = 'Speed',
     callback = funcs.speed
@@ -942,7 +1024,17 @@ localCheats:AddToggle({
     max = 500
 });
 
-localCheats:AddToggle({text = 'Auto Pickup', callback = funcs.autoPickup});
+localCheats:AddToggle({
+    text = 'Auto Pickup',
+    callback = funcs.autoPickup
+}):AddSlider({
+    textpos = 2,
+    text = 'Auto Pickup Range',
+    min = 5,
+    value = 50,
+    max = 250
+});
+
 localCheats:AddToggle({text = 'No Clip', callback = funcs.noClip});
 localCheats:AddToggle({text = 'No Kill Bricks', callback = funcs.noKillBricks});
 localCheats:AddToggle({text = 'No Fall Damage'});
@@ -955,6 +1047,7 @@ localCheats:AddButton({text = 'Remove ForceField', callback = funcs.removeFF});
 localCheats:AddBind({text = 'Instant Log', nomouse = true, callback = funcs.instantLog});
 localCheats:AddBind({text = 'Attach To Back', mode = 'hold', callback = funcs.attachToBack});
 
+visualCheats:AddToggle({text = 'Show Character Name', state = true, tip = 'Shows the in-game character name on the player ESP.'});
 visualCheats:AddToggle({text = 'No Fog', callback = funcs.noFog});
 visualCheats:AddToggle({text = 'No Rain', callback = funcs.noRain});
 
@@ -975,9 +1068,9 @@ visualCheats:AddList({
 
 visualCheats:AddToggle({text = 'Time Changer', callback = funcs.timeChanger});
 
-riskyCheats:AddButton({text = 'Rollback Data', callback = funcs.rollbackData});
-riskyCheats:AddButton({text = 'Purchase Item', callback = funcs.giveItem});
+riskyCheats:AddLabel('These fire server remotes and can get you banned.');
 riskyCheats:AddList({text = 'Item Name', values = purchasableItems});
+riskyCheats:AddButton({text = 'Purchase Item', callback = funcs.giveItem});
 
 teleportCheats:AddList({text = 'Chakra Point', values = chakraPoints});
 teleportCheats:AddButton({text = 'Teleport To', callback = funcs.teleportToChakraPoint});
@@ -989,3 +1082,4 @@ teleportCheats:AddList({text = 'Players', flag = 'Player Teleport', playerOnly =
 teleportCheats:AddButton({text = 'Teleport To', callback = funcs.teleportToPlayer});
 
 miscCheats:AddToggle({text = 'Thunderstorm Server Finder', callback = funcs.findThunderstormServer});
+miscCheats:AddButton({text = 'Server Hop', callback = funcs.serverHop});
