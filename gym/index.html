@@ -115,6 +115,14 @@ h2{font-size:19px;font-weight:700;letter-spacing:-.01em;margin:0 0 14px}
 .btn.light{background:var(--soft);color:var(--ink);font-weight:500;font-size:15px;min-height:48px}
 .row2{display:flex;gap:10px}
 .hint{color:var(--mid);font-size:13.5px;line-height:1.6;margin:14px 0 0}
+.warmup{margin-top:12px;background:var(--bg);border-radius:11px;padding:9px 12px;font-size:13.5px;color:var(--mid);line-height:1.45}
+.warmup b{color:var(--ink);font-weight:500}
+.banner{display:none;align-items:center;gap:12px;background:var(--soft);border-radius:14px;padding:14px;margin-top:18px}
+.banner.on{display:flex}
+.banner p{margin:0;flex:1;font-size:14px;line-height:1.45;color:var(--mid)}
+.banner button{flex:0 0 auto;border:0;background:var(--ink);color:var(--bg);border-radius:11px;height:42px;padding:0 16px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.row3{display:flex;gap:8px;flex-wrap:wrap}
+.row3 .btn{flex:1 1 30%;min-width:96px;margin-top:0}
 
 .check{display:flex;gap:12px;align-items:flex-start;padding:12px 0;cursor:pointer}
 .check input{appearance:none;width:22px;height:22px;flex:0 0 auto;margin-top:2px;border:1.5px solid var(--line);border-radius:7px;background:var(--soft)}
@@ -168,6 +176,11 @@ h2{font-size:19px;font-weight:700;letter-spacing:-.01em;margin:0 0 14px}
   <button class="theme" id="themeBtn">Dark</button>
 </div>
 
+<div class="banner" id="banner">
+  <p id="bannerText"></p>
+  <button id="bannerGo">Back up</button>
+</div>
+
 <div class="days" id="days" role="tablist"></div>
 <main id="main"></main>
 
@@ -197,6 +210,7 @@ h2{font-size:19px;font-weight:700;letter-spacing:-.01em;margin:0 0 14px}
     <button class="btn light" id="impBtn">Restore</button>
   </div>
   <input type="file" id="impFile" accept="application/json" hidden>
+  <button class="btn light" id="copyBtn" style="margin-top:8px">Copy my log as text</button>
   <p class="hint" id="note"></p>
 </section>
 
@@ -239,7 +253,7 @@ matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>{if(them
 /* ── programme ── */
 const PLAN=[
 {id:'d1',day:'Day 1',name:'Push',kind:'lift',ex:[
- {id:'dbbench',n:'DB bench press',m:'chest',sets:4,lo:6,hi:8,inc:5,start:25,rest:150,
+ {id:'dbbench',n:'DB bench press',m:'chest',sets:4,lo:6,hi:8,inc:5,start:25,rest:150,warm:1,
   tip:'Shoulder blades pinned back and down. Lower until the dumbbells are level with your chest — the stretch at the bottom is where the growth is.'},
  {id:'incdb',n:'Incline DB press',m:'chest',sets:4,lo:8,hi:10,inc:5,start:20,rest:120,
   tip:'Bench at about 30 degrees. Any steeper and it turns into a shoulder press.'},
@@ -253,7 +267,7 @@ const PLAN=[
   tip:'Upper arms stay pointed at the ceiling. Only the elbows move.'}]},
 
 {id:'d2',day:'Day 2',name:'Pull',kind:'lift',ex:[
- {id:'pullup',n:'Pull-ups',m:'back',sets:4,lo:5,hi:8,inc:5,start:0,rest:150,bw:1,
+ {id:'pullup',n:'Pull-ups',m:'back',sets:4,lo:5,hi:8,inc:5,start:0,rest:150,bw:1,warm:1,
   tip:'Dead hang at the bottom of every rep. Drive your elbows down toward your ribs.'},
  {id:'row1',n:'One-arm DB row',m:'back',sets:4,lo:8,hi:10,inc:5,start:25,rest:120,
   tip:'Row toward your hip, not your armpit. Let the shoulder blade stretch forward at the bottom.'},
@@ -267,7 +281,7 @@ const PLAN=[
   tip:'Either works. Preacher curls stop you swinging, which is why they are worth using. Three seconds down on every rep.'}]},
 
 {id:'d3',day:'Day 3',name:'Legs',kind:'lift',ex:[
- {id:'squat',n:'Squat',m:'legs',sets:4,lo:6,hi:8,inc:10,start:45,rest:180,bar:45,
+ {id:'squat',n:'Squat',m:'legs',sets:4,lo:6,hi:8,inc:10,start:45,rest:180,bar:45,warm:1,
   tip:'Brace like you are about to take a punch. Hips and knees break together, go to at least parallel.'},
  {id:'rdl',n:'DB Romanian deadlift',m:'legs',sets:3,lo:8,hi:10,inc:5,start:30,rest:150,
   tip:'Push your hips back with soft knees. The hamstring stretch stops you, not the floor.'},
@@ -281,7 +295,7 @@ const PLAN=[
   tip:'Curl your pelvis up at the top. Legs alone is mostly hip flexor.'}]},
 
 {id:'d4',day:'Day 4',name:'Push B',kind:'lift',ex:[
- {id:'incdb2',n:'Incline DB press',m:'chest',sets:4,lo:6,hi:8,inc:5,start:20,rest:150,
+ {id:'incdb2',n:'Incline DB press',m:'chest',sets:4,lo:6,hi:8,inc:5,start:20,rest:150,warm:1,
   tip:'Heavier than Day 1. Kick the dumbbells up with your knees to get into position.'},
  {id:'flatdb2',n:'Flat DB press',m:'chest',sets:3,lo:10,hi:12,inc:5,start:20,rest:120,
   tip:'Lighter than Day 1, chasing the stretch instead of the load.'},
@@ -295,7 +309,7 @@ const PLAN=[
   tip:'Lower to your forehead. Elbows point forward and stay there.'}]},
 
 {id:'d5',day:'Day 5',name:'Pull B',kind:'lift',ex:[
- {id:'pulldown2',n:'Wide lat pulldown',m:'back',sets:4,lo:8,hi:10,inc:10,start:70,rest:120,
+ {id:'pulldown2',n:'Wide lat pulldown',m:'back',sets:4,lo:8,hi:10,inc:10,start:70,rest:120,warm:1,
   tip:'Heavier than Day 2. Lean back slightly and hold that angle the whole set.'},
  {id:'row2',n:'Barbell row',m:'back',sets:4,lo:8,hi:10,inc:5,start:65,rest:120,bar:45,
   tip:'Hinge to about 45 degrees and stay there. Row to your belly button, lower under control.'},
@@ -309,7 +323,7 @@ const PLAN=[
   tip:'Neutral grip, thumbs up. Builds the muscle under the bicep that pushes your arm wider.'}]},
 
 {id:'d6',day:'Day 6',name:'Legs B',kind:'lift',ex:[
- {id:'trapdl',n:'Trap bar deadlift',m:'legs',sets:4,lo:5,hi:5,inc:10,start:95,rest:180,bar:55,
+ {id:'trapdl',n:'Trap bar deadlift',m:'legs',sets:4,lo:5,hi:5,inc:10,start:95,rest:180,bar:55,warm:1,
   tip:'Chest up, push the floor away. Stop the set the moment your lower back rounds.'},
  {id:'lunge',n:'Walking lunges',m:'legs',sets:3,lo:10,hi:12,inc:5,start:15,rest:120,
   tip:'Long steps, torso upright, back knee never slams down.'},
@@ -332,11 +346,11 @@ const EX={},ORDER=PLAN.map(d=>d.id);
 PLAN.forEach(d=>(d.ex||[]).forEach(e=>EX[e.id]=e));
 const MUSCLES=['chest','back','shoulders','arms','legs','core'];
 
-const KEY='traininglog.v3',BLANK={targets:{},history:{},bw:[],rest:{},current:null};
+const KEY='traininglog.v3',BLANK={targets:{},history:{},bw:[],rest:{},current:null,since:0};
 let S=(()=>{
   for(const k of [KEY,'traininglog.v2','liftlog.v1']){
     try{const r=Store.get(k);if(r){const o=JSON.parse(r);
-      return Object.assign({},BLANK,{targets:o.targets||{},history:o.history||{},bw:o.bw||[],rest:o.rest||{}})}}catch(e){}
+      return Object.assign({},BLANK,{targets:o.targets||{},history:o.history||{},bw:o.bw||[],rest:o.rest||{},since:o.since||0})}}catch(e){}
   }
   return JSON.parse(JSON.stringify(BLANK));})();
 const save=()=>Store.set(KEY,JSON.stringify(S));
@@ -367,6 +381,24 @@ function plateLine(e,w){
   const out=[];
   PLATES.forEach(p=>{while(side>=p-1e-9){out.push(p);side=Math.round((side-p)*10)/10}});
   return out.map(n).join(' + ')+' per side';
+}
+
+/* warm-up ramp for the first heavy lift of the session */
+function warmupLine(e,w){
+  if(!e.warm)return null;
+  if(e.bw)return 'Warm up: 2 light sets on the pulldown, then 3 easy reps here.';
+  const r=v=>Math.round(v/5)*5,steps=[];
+  if(e.bar){
+    steps.push(e.bar+' lb bar × 8');
+    const a=r(w*.6),b=r(w*.8);
+    if(a>e.bar)steps.push(a+' × 5');
+    if(b>e.bar&&b>a)steps.push(b+' × 3');
+  }else{
+    const a=Math.max(5,r(w*.5)),b=r(w*.75);
+    steps.push(a+' lb × 8');
+    if(b>a)steps.push(b+' × 4');
+  }
+  return 'Warm up: '+steps.join(' &middot; ')+' &mdash; then start your working sets.';
 }
 
 const main=document.getElementById('main');
@@ -428,6 +460,9 @@ function card(e){
   top.querySelector('.ex-name').textContent=e.n;
   C.appendChild(top);
 
+  const warm=document.createElement('div');warm.className='warmup';
+  if(e.warm)C.appendChild(warm);
+
   const inputs=document.createElement('div');inputs.className='inputs';
   const wt=document.createElement('div');wt.className='weight';
   wt.innerHTML='<button aria-label="Lighter">−</button><input type="number" inputmode="decimal" step="'+e.inc+'" aria-label="Weight for '+e.n+'"><button aria-label="Heavier">+</button>';
@@ -450,9 +485,10 @@ function card(e){
   const meta=document.createElement('div');meta.className='meta';
   const p=document.createElement('p');
   const setLine=()=>{
-    const pl=plateLine(e,+wi.value||0);
+    const w=+wi.value||0,pl=plateLine(e,w);
     p.textContent=pl||(last?'Last time: '+(last.w?n(last.w)+' lb':'bodyweight')+' × '+last.reps.join(', ')
                             :'First time on this lift');
+    if(e.warm){const wl=warmupLine(e,w);warm.innerHTML=wl?'<b>'+wl.split(':')[0]+':</b>'+wl.slice(wl.indexOf(':')+1):''}
   };
   wi.addEventListener('input',setLine);setLine();
   const tip=document.createElement('button');tip.className='tips';tip.textContent='Tips';
@@ -502,7 +538,8 @@ function saveSession(d){
     }
   });
   if(!logged){toast('Fill in some reps first');return}
-  save();drawDays();drawVol();
+  S.since=(S.since||0)+1;
+  save();drawDays();drawVol();drawBanner();
   toast(bumps?bumps+(bumps>1?' lifts go up':' lift goes up')+' next time':'Session saved');
 }
 
@@ -578,11 +615,38 @@ function tickT(){
 document.getElementById('tSkip').onclick=()=>{clearInterval(ti);tEl.classList.remove('on')};
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&tEl.classList.contains('on'))tickT()});
 
-document.getElementById('expBtn').onclick=()=>{
+function drawBanner(){
+  const b=document.getElementById('banner'),since=S.since||0;
+  const sessions=Object.values(S.history).reduce((t,h)=>t+h.length,0);
+  if(sessions&&since>=5){
+    b.classList.add('on');
+    document.getElementById('bannerText').textContent=
+      since+' sessions since your last backup. Phones get lost and browsers get cleared \u2014 save a copy now.';
+  }else b.classList.remove('on');
+}
+function backup(){
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));
   a.download='training-log-'+today()+'.json';a.click();URL.revokeObjectURL(a.href);
-  toast('Backup saved to your downloads');
+  S.since=0;save();drawBanner();
+  toast('Backup saved \u2014 keep it somewhere off this phone');
+}
+document.getElementById('expBtn').onclick=backup;
+document.getElementById('bannerGo').onclick=backup;
+document.getElementById('copyBtn').onclick=async()=>{
+  const txt=JSON.stringify(S);
+  try{
+    await navigator.clipboard.writeText(txt);
+    S.since=0;save();drawBanner();
+    toast('Copied \u2014 paste it somewhere you will still have next year');
+  }catch(err){
+    const ta=document.createElement('textarea');
+    ta.value=txt;ta.style.cssText='position:fixed;top:0;left:0;opacity:0';
+    document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');S.since=0;save();drawBanner();toast('Copied to your clipboard')}
+    catch(e2){toast('Could not copy \u2014 use Save a backup instead')}
+    ta.remove();
+  }
 };
 document.getElementById('impBtn').onclick=()=>document.getElementById('impFile').click();
 document.getElementById('impFile').onchange=ev=>{
@@ -590,7 +654,7 @@ document.getElementById('impFile').onchange=ev=>{
   const r=new FileReader();
   r.onload=()=>{try{
     const d=JSON.parse(r.result);if(!d||typeof d!=='object')throw 0;
-    S=Object.assign({},BLANK,d);S.current=nextDay();save();draw();drawBW();toast('Backup restored');
+    S=Object.assign({},BLANK,d);S.current=nextDay();S.since=0;save();draw();drawBW();toast('Backup restored');
   }catch(e){toast('That file could not be read')}};
   r.readAsText(f);
 };
@@ -602,7 +666,7 @@ function toast(msg){
   clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('on'),2400);
 }
 
-function draw(){drawDays();drawDay();drawVol()}
+function draw(){drawDays();drawDay();drawVol();drawBanner()}
 draw();drawBW();
 document.getElementById('note').textContent=Store.ok
   ? 'Saved in this browser only — nothing leaves your phone. Save a backup every few weeks so clearing your browser data does not wipe it.'
