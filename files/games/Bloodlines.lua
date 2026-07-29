@@ -24,7 +24,7 @@ local Webhook = sharedRequire('utils/Webhook.lua');
 local cloneref = cloneref or function(object) return object end;
 
 -- Services
-local Players, ReplicatedStorage, RunService, UserInputService, Lighting, MemStorageService, TeleportService, HttpService = Services:Get('Players', 'ReplicatedStorage', 'RunService', 'UserInputService', 'Lighting', 'MemStorageService', 'TeleportService', 'HttpService');
+local Players, ReplicatedStorage, RunService, UserInputService, Lighting, MemStorageService, TeleportService, HttpService, TweenService = Services:Get('Players', 'ReplicatedStorage', 'RunService', 'UserInputService', 'Lighting', 'MemStorageService', 'TeleportService', 'HttpService', 'TweenService');
 
 Players = cloneref(Players);
 ReplicatedStorage = cloneref(ReplicatedStorage);
@@ -32,8 +32,14 @@ RunService = cloneref(RunService);
 UserInputService = cloneref(UserInputService);
 Lighting = cloneref(Lighting);
 TeleportService = cloneref(TeleportService);
+TweenService = cloneref(TweenService);
 
 local MAIN_PLACE_ID = 10266164381;
+
+-- Attach To Back
+local ATTACH_MAX_RANGE = 300;
+local ATTACH_TWEEN_SPEED = 100;
+local ATTACH_MIN_STEP = 0.5;
 
 if (game.PlaceId ~= MAIN_PLACE_ID) then
     return ToastNotif.new({text = 'Script will not run in lobby.'});
@@ -96,6 +102,7 @@ local localPlayerData = Utility:getPlayerData();
 local chakraPoints = {};
 local npcs = {};
 local purchasableItems = {};
+local itemNames = {};
 
 local loadSound;
 local inDanger = false;
@@ -522,26 +529,90 @@ do
             end);
         end;
 
-        function funcs.attachToBack()
-            local myRootPart = localPlayerData.rootPart;
-            if (not myRootPart) then return end;
-
+        -- Finds the closest living entity to us that's still inside attach range
+        local function getClosestEntity(myRootPart)
             local myPosition = myRootPart.Position;
-            local last, target = math.huge, nil;
+            local closest, closestDistance = nil, math.huge;
 
-            for _, part in next, entities do
-                local dist = (myPosition - part.Position).Magnitude;
+            for _, rootPart in next, entities do
+                if (not rootPart.Parent or rootPart == myRootPart) then continue end;
 
-                if (dist < last) then
-                    last = dist;
-                    target = part;
+                local distance = (rootPart.Position - myPosition).Magnitude;
+
+                if (distance < ATTACH_MAX_RANGE and distance < closestDistance) then
+                    closest, closestDistance = rootPart, distance;
                 end;
             end;
 
-            if (target) then
-                myRootPart.CFrame = target.CFrame * CFrame.new(0, 0, 2);
-            end;
+            return closest;
         end;
+
+        library.OnKeyPress:Connect(function(input, gpe)
+            if (gpe or not library.options.attachToBack) then return end;
+
+            local key = library.options.attachToBack.key;
+            if (input.KeyCode.Name ~= key and input.UserInputType.Name ~= key) then return end;
+
+            local myRootPart = localPlayerData.rootPart;
+            if (not myRootPart) then return end;
+
+            local closest;
+
+            -- Keep looking while the key is held, in case nothing is in range yet
+            repeat
+                closest = getClosestEntity(myRootPart);
+                if (closest) then break end;
+
+                task.wait();
+            until (input.UserInputState == Enum.UserInputState.End);
+
+            if (not closest or input.UserInputState == Enum.UserInputState.End) then return end;
+
+            local lastGoalPos;
+
+            maid.attachToBack = RunService.Heartbeat:Connect(function()
+                -- The character can respawn while we're attached, so re-grab the root part every frame
+                local rootPart = localPlayerData.rootPart;
+
+                if (not rootPart or not closest.Parent) then
+                    maid.attachToBack = nil;
+                    maid.attachToBackTween = nil;
+                    return;
+                end;
+
+                local targetCF = closest.CFrame;
+                local goalPos = (targetCF * CFrame.new(0, library.flags.attachToBackHeight, library.flags.attachToBackSpace)).Position;
+
+                -- Always face them, otherwise a negative space slider puts us in front with our back turned
+                local offset = goalPos - targetCF.Position;
+                local goalCF = offset.Magnitude > ATTACH_MIN_STEP and CFrame.lookAt(goalPos, targetCF.Position) or targetCF;
+
+                -- Don't respam tweens when the target is basically standing still
+                if (lastGoalPos and (goalCF.Position - lastGoalPos).Magnitude < ATTACH_MIN_STEP) then return end;
+                lastGoalPos = goalCF.Position;
+
+                local distance = (goalCF.Position - rootPart.Position).Magnitude;
+                local tween = TweenService:Create(rootPart, TweenInfo.new(distance / ATTACH_TWEEN_SPEED, Enum.EasingStyle.Linear), {
+                    CFrame = goalCF
+                });
+
+                tween:Play();
+
+                maid.attachToBackTween = function()
+                    tween:Cancel();
+                end;
+            end);
+        end);
+
+        library.OnKeyRelease:Connect(function(input)
+            if (not library.options.attachToBack) then return end;
+
+            local key = library.options.attachToBack.key;
+            if (input.KeyCode.Name ~= key and input.UserInputType.Name ~= key) then return end;
+
+            maid.attachToBack = nil;
+            maid.attachToBackTween = nil;
+        end);
     end;
 
     -- ESP UI
@@ -584,6 +655,26 @@ do
                     float = 100,
                     textpos = 2
                 });
+
+                -- Fallback color for anything in this category without its own picker
+                section:AddColor({
+                    text = `{flagName} Color`,
+                    color = Color3.new(1, 1, 1)
+                });
+            end;
+
+            -- Per-name show filter + color picker, same as Permafall's trinkets
+            local function makeNameList(section, names)
+                for _, name in next, names do
+                    section:AddToggle({
+                        text = name,
+                        flag = `Show {name}`,
+                        state = true
+                    }):AddColor({
+                        text = `{name} Color`,
+                        color = Color3.new(1, 1, 1)
+                    });
+                end;
             end;
 
             makeFor(npcsSection, 'Npcs', npcsESP);
@@ -591,6 +682,11 @@ do
             makeFor(areasSection, 'Areas', areasESP);
             makeFor(itemsSection, 'Items', itemsESP);
             makeFor(chakraSection, 'Chakra Points', chakraPointsESP);
+
+            if (#itemNames > 0) then
+                itemsSection:AddDivider('Per Item');
+                makeNameList(itemsSection, itemNames);
+            end;
 
             mobsSection:AddToggle({
                 text = 'Show Health',
@@ -643,12 +739,15 @@ do
     -- Add Purchasable Items
     do
         for itemName, item in next, gameManager.Items or {} do
+            table.insert(itemNames, itemName);
+
             if (typeof(item) == 'table' and item.Buyabble) then
                 table.insert(purchasableItems, itemName);
             end;
         end;
 
         table.sort(purchasableItems);
+        table.sort(itemNames);
     end;
 
     -- Mod Detector
@@ -888,38 +987,47 @@ do
 
     function funcs.flyHack(state)
         if (not state) then
-            maid.flyBodyVelocity = nil;
-            maid.flyStepped = nil;
+            maid.flyBv = nil;
+            maid.flyHack = nil;
+
+            local humanoid = localPlayerData.humanoid;
+            if (humanoid) then
+                humanoid.PlatformStand = false;
+            end;
+
             return;
         end;
 
-        local bodyVelocity = Instance.new('BodyVelocity');
-        bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge);
-        bodyVelocity.Velocity = Vector3.zero;
+        maid.flyBv = Instance.new('BodyVelocity');
+        maid.flyBv.MaxForce = Vector3.new(math.huge, math.huge, math.huge);
+        maid.flyBv.Velocity = Vector3.zero;
 
-        maid.flyBodyVelocity = bodyVelocity;
-
-        maid.flyStepped = RunService.Stepped:Connect(function()
+        maid.flyHack = RunService.Heartbeat:Connect(function()
+            local rootPart, humanoid = localPlayerData.rootPart, localPlayerData.humanoid;
             local camera = workspace.CurrentCamera;
-            if (not camera) then return end;
+            if (not rootPart or not camera) then return end;
 
-            local rootPart = localPlayerData.rootPart;
-            if (not rootPart) then return end;
+            -- Respawning drops the body mover, so just re-parent it every frame
+            maid.flyBv.Parent = rootPart;
 
-            -- The character respawning drops our body mover, so re-parent it when that happens
-            if (bodyVelocity.Parent ~= rootPart) then
-                bodyVelocity.Parent = rootPart;
-            end;
-
-            local rawMoveVector = ControlModule:GetMoveVector();
-            local moveVector = camera.CFrame:VectorToWorldSpace(rawMoveVector);
+            local moveVector = camera.CFrame:VectorToWorldSpace(ControlModule:GetMoveVector());
 
             if (library.flags.flyVertical) then
                 local upValue = (UserInputService:IsKeyDown(Enum.KeyCode.Space) and 1 or 0) + (UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and -1 or 0);
                 moveVector = Vector3.new(moveVector.X, upValue, moveVector.Z);
             end;
 
-            bodyVelocity.Velocity = moveVector * library.flags.flySpeed;
+            -- Diagonals would otherwise be ~1.4x faster than a straight line
+            if (moveVector.Magnitude > 1) then
+                moveVector = moveVector.Unit;
+            end;
+
+            -- Stops the humanoid from fighting us with its own running/falling forces
+            if (humanoid and not humanoid.PlatformStand) then
+                humanoid.PlatformStand = true;
+            end;
+
+            maid.flyBv.Velocity = moveVector * library.flags.flySpeed;
         end);
     end;
 
@@ -997,87 +1105,131 @@ do
 end;
 
 -- Add Features To UI
+localCheats:AddDivider('Movement');
+
+localCheats:AddToggle({text = 'Fly', callback = funcs.flyHack});
+
+localCheats:AddSlider({
+    text = 'Fly Speed',
+    min = 0,
+    value = 50,
+    max = 500,
+    textpos = 2
+});
+
+localCheats:AddToggle({text = 'Fly Vertical', state = true, tip = 'Space to go up, Left Shift to go down.'});
+
+localCheats:AddToggle({text = 'Speed', callback = funcs.speed});
+
+localCheats:AddSlider({
+    text = 'Move Speed',
+    min = 0,
+    value = 50,
+    max = 500,
+    textpos = 2
+});
+
+localCheats:AddToggle({text = 'Infinite Jump', callback = funcs.infiniteJump});
+localCheats:AddToggle({text = 'No Clip', callback = funcs.noClip});
+
+localCheats:AddDivider('Attach To Back');
+
+localCheats:AddBind({
+    text = 'Attach To Back',
+    mode = 'hold',
+    tip = 'Hold to tween onto the nearest entity.'
+});
+
+localCheats:AddSlider({
+    text = 'Attach To Back Height',
+    min = -100,
+    value = 0,
+    max = 100,
+    textpos = 2
+});
+
+localCheats:AddSlider({
+    text = 'Attach To Back Space',
+    min = -100,
+    value = 2,
+    max = 100,
+    textpos = 2
+});
+
+localCheats:AddDivider('Pickups');
+
+localCheats:AddToggle({text = 'Auto Pickup', callback = funcs.autoPickup});
+
+localCheats:AddSlider({
+    text = 'Auto Pickup Range',
+    min = 5,
+    value = 50,
+    max = 250,
+    textpos = 2
+});
+
+localCheats:AddDivider('Protection');
+
+localCheats:AddToggle({text = 'No Kill Bricks', callback = funcs.noKillBricks});
+localCheats:AddToggle({text = 'No Fall Damage'});
+
+localCheats:AddDivider('Notifiers');
+
 localCheats:AddToggle({text = 'Moderator Sound Alert'});
 localCheats:AddToggle({text = 'Chakra Sense Notifier', state = true});
 localCheats:AddToggle({text = 'Danger Notifier', state = true});
 
-localCheats:AddToggle({
-    text = 'Fly',
-    callback = funcs.flyHack
-}):AddSlider({
-    textpos = 2,
-    text = 'Fly Speed',
-    min = 0,
-    max = 500
-});
+localCheats:AddDivider('Chat Logger');
 
-localCheats:AddToggle({text = 'Fly Vertical', state = true, tip = 'Space to go up, Left Shift to go down.'});
-localCheats:AddToggle({text = 'Infinite Jump', callback = funcs.infiniteJump});
-
-localCheats:AddToggle({
-    text = 'Speed',
-    callback = funcs.speed
-}):AddSlider({
-    textpos = 2,
-    text = 'Move Speed',
-    min = 0,
-    max = 500
-});
-
-localCheats:AddToggle({
-    text = 'Auto Pickup',
-    callback = funcs.autoPickup
-}):AddSlider({
-    textpos = 2,
-    text = 'Auto Pickup Range',
-    min = 5,
-    value = 50,
-    max = 250
-});
-
-localCheats:AddToggle({text = 'No Clip', callback = funcs.noClip});
-localCheats:AddToggle({text = 'No Kill Bricks', callback = funcs.noKillBricks});
-localCheats:AddToggle({text = 'No Fall Damage'});
 localCheats:AddToggle({text = 'Chat Logger', callback = funcs.chatLogger});
 localCheats:AddToggle({text = 'Chat Logger Auto Scroll'});
 
+localCheats:AddDivider('Character');
+
 localCheats:AddButton({text = 'Reset Character', callback = funcs.resetCharacter});
 localCheats:AddButton({text = 'Remove ForceField', callback = funcs.removeFF});
-
 localCheats:AddBind({text = 'Instant Log', nomouse = true, callback = funcs.instantLog});
-localCheats:AddBind({text = 'Attach To Back', mode = 'hold', callback = funcs.attachToBack});
+
+visualCheats:AddDivider('ESP');
 
 visualCheats:AddToggle({text = 'Show Character Name', state = true, tip = 'Shows the in-game character name on the player ESP.'});
+
+visualCheats:AddDivider('World');
+
 visualCheats:AddToggle({text = 'No Fog', callback = funcs.noFog});
 visualCheats:AddToggle({text = 'No Rain', callback = funcs.noRain});
 
-visualCheats:AddToggle({
-    text = 'Full Bright',
-    callback = funcs.fullBright
-}):AddSlider({
+visualCheats:AddToggle({text = 'Full Bright', callback = funcs.fullBright});
+
+visualCheats:AddSlider({
     text = 'Brightness Level',
     min = 1,
+    value = 5,
     max = 10,
-    float = 0.1
-});
-
-visualCheats:AddList({
-    text = 'Time Of Day',
-    values = {'Morning', 'Afternoon', 'Evening', 'Night'},
+    float = 0.1,
+    textpos = 2
 });
 
 visualCheats:AddToggle({text = 'Time Changer', callback = funcs.timeChanger});
+
+visualCheats:AddList({
+    text = 'Time Of Day',
+    values = {'Morning', 'Afternoon', 'Evening', 'Night'}
+});
 
 riskyCheats:AddLabel('These fire server remotes and can get you banned.');
 riskyCheats:AddList({text = 'Item Name', values = purchasableItems});
 riskyCheats:AddButton({text = 'Purchase Item', callback = funcs.giveItem});
 
+teleportCheats:AddDivider('Chakra Points');
 teleportCheats:AddList({text = 'Chakra Point', values = chakraPoints});
 teleportCheats:AddButton({text = 'Teleport To', callback = funcs.teleportToChakraPoint});
 
+teleportCheats:AddDivider('NPCs');
 teleportCheats:AddList({text = 'NPCs', flag = 'NPC Teleport', values = npcs});
 teleportCheats:AddButton({text = 'Teleport To', callback = funcs.teleportToNPC});
 
+teleportCheats:AddDivider('Players');
 teleportCheats:AddList({text = 'Players', flag = 'Player Teleport', playerOnly = true});
 teleportCheats:AddButton({text = 'Teleport To', callback = funcs.teleportToPlayer});
 
