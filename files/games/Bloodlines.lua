@@ -101,6 +101,7 @@ local localPlayerData = Utility:getPlayerData();
 
 local chakraPoints = {};
 local npcs = {};
+local mobs = {};
 local purchasableItems = {};
 local itemNames = {};
 
@@ -405,8 +406,11 @@ do
     -- Workspace Entities (NPCs, Mobs, Pickupables, Attachables)
     do
         local npcsList = {};
+        local mobsList = {};
         local pickupList = {};
-        local entities = {};
+
+        -- rootPart -> 'player' | 'mob' | 'npc', so attach to back can filter by what you actually want
+        local attachTargets = {};
 
         local function onNpcAdded(object)
             local npcValue = object:WaitForChild('NPC', 10);
@@ -418,18 +422,36 @@ do
             if (npcValue.Value == 'Dialog') then
                 table.insert(npcs, object.Name);
                 npcsList[object.Name] = object;
+                attachTargets[rootPart] = 'npc';
 
                 local npcESP = npcsESP.new(rootPart, object.Name);
 
                 object.Destroying:Connect(function()
                     table.remove(npcs, table.find(npcs, object.Name));
                     npcsList[object.Name] = nil;
+                    attachTargets[rootPart] = nil;
                     npcESP:Destroy();
                 end);
             elseif (npcValue.Value == 'Combat') then
+                -- onEntityAdded may have already tagged this as a player, we know better
+                attachTargets[rootPart] = 'mob';
+
+                local mobName = object.Name;
+
+                -- Unlike dialog NPCs there can be a dozen of the same mob, so track them as a set per name
+                if (not table.find(mobs, mobName)) then
+                    table.insert(mobs, mobName);
+                    table.sort(mobs);
+                end;
+
+                mobsList[mobName] = mobsList[mobName] or {};
+                mobsList[mobName][rootPart] = true;
+
                 local mobESP = mobsESP.new(rootPart, object.Name);
 
                 object.Destroying:Connect(function()
+                    attachTargets[rootPart] = nil;
+                    mobsList[mobName][rootPart] = nil;
                     mobESP:Destroy();
                 end);
             end;
@@ -464,14 +486,13 @@ do
             local rootPart = object:WaitForChild('HumanoidRootPart', 10);
             if (not rootPart or not object.Parent) then return end;
 
-            -- Dialog NPCs are useless to attach to, they never move
-            local npcValue = FindFirstChild(object, 'NPC');
-            if (npcValue and npcValue.Value == 'Dialog') then return end;
-
-            table.insert(entities, rootPart);
+            -- onNpcAdded classifies NPCs properly, so only claim this one if it hasn't already
+            if (not attachTargets[rootPart] and not FindFirstChild(object, 'NPC')) then
+                attachTargets[rootPart] = 'player';
+            end;
 
             object.Destroying:Connect(function()
-                table.remove(entities, table.find(entities, rootPart));
+                attachTargets[rootPart] = nil;
             end);
         end;
 
@@ -502,6 +523,34 @@ do
             rootPart.CFrame = CFrame.new(main.Position + Vector3.new(0, 0, -5), main.Position);
         end;
 
+        function funcs.teleportToMob()
+            local mobName = library.flags.mobTeleport;
+            local spawned = mobsList[mobName];
+
+            local rootPart = localPlayerData.rootPart;
+            if (not rootPart) then return end;
+
+            -- Plenty of mobs share a name, so go to whichever one is closest
+            local myPosition = rootPart.Position;
+            local closest, closestDistance = nil, math.huge;
+
+            for mobRootPart in next, spawned or {} do
+                if (not mobRootPart.Parent) then continue end;
+
+                local distance = (mobRootPart.Position - myPosition).Magnitude;
+
+                if (distance < closestDistance) then
+                    closest, closestDistance = mobRootPart, distance;
+                end;
+            end;
+
+            if (not closest) then
+                return ToastNotif.new({text = 'No mob by that name is alive right now.'});
+            end;
+
+            rootPart.CFrame = CFrame.new(closest.Position + Vector3.new(0, 0, -5), closest.Position);
+        end;
+
         function funcs.autoPickup(state)
             if (not state) then
                 maid.autoPickup = nil;
@@ -529,13 +578,20 @@ do
             end);
         end;
 
-        -- Finds the closest living entity to us that's still inside attach range
+        local ATTACH_KIND_FLAGS = {
+            player = 'attachToPlayers',
+            mob = 'attachToMobs',
+            npc = 'attachToNpcs'
+        };
+
+        -- Finds the closest enabled target to us that's still inside attach range
         local function getClosestEntity(myRootPart)
             local myPosition = myRootPart.Position;
             local closest, closestDistance = nil, math.huge;
 
-            for _, rootPart in next, entities do
+            for rootPart, kind in next, attachTargets do
                 if (not rootPart.Parent or rootPart == myRootPart) then continue end;
+                if (not library.flags[ATTACH_KIND_FLAGS[kind]]) then continue end;
 
                 local distance = (rootPart.Position - myPosition).Magnitude;
 
@@ -717,22 +773,25 @@ do
     end;
 
     do -- // Download Assets
-        -- local assetsList = {'ModeratorJoin.mp3', 'ModeratorLeft.mp3'};
-        -- local assets = {};
+        local assetsList = {'ModeratorJoin.mp3', 'ModeratorLeft.mp3'};
+        local audios = {};
 
-        -- local apiEndpoint = USE_INSECURE_ENDPOINT and 'http://test.aztupscripts.xyz' or 'https://aztupscripts.xyz';
+        local apiEndpoint = 'https://rukiascripts.xyz/';
 
-        -- for i, v in next, assetsList do
-        --     if(not isfile(string.format('Aztup Hub V3/%s', v))) then
-        --         print('Downloading', v, '...');
-        --         writefile(string.format('Aztup Hub V3/%s', v), game:HttpGet(string.format('%s/%s', apiEndpoint, v)));
-        --     end;
+        for i, v in next, assetsList do
+            audios[v] = AudioPlayer.new({
+                url = `{apiEndpoint}{v}`,
+                volume = 10,
+                forcedAudio = true
+            });
+        end;
 
-        --     assets[v] = getasset(string.format('Aztup Hub V3/%s', v));
-        -- end;
+        function loadSound(soundName: string): ()
+            if ((soundName == 'ModeratorJoin.mp3' or soundName == 'ModeratorLeft.mp3') and not library.flags.modNotifier) then
+                return;
+            end;
 
-        function loadSound(soundName)
-
+            audios[soundName]:Play();
         end;
     end;
 
@@ -985,7 +1044,7 @@ do
         end);
     end;
 
-    function funcs.flyHack(state)
+    function funcs.fly(state)
         if (not state) then
             maid.flyBv = nil;
             maid.flyHack = nil;
@@ -1027,7 +1086,7 @@ do
                 humanoid.PlatformStand = true;
             end;
 
-            maid.flyBv.Velocity = moveVector * library.flags.flySpeed;
+            maid.flyBv.Velocity = moveVector * library.flags.flyHackValue;
         end);
     end;
 
@@ -1045,7 +1104,7 @@ do
         end);
     end;
 
-    function funcs.speed(state)
+    function funcs.speedHack(state)
         if (not state) then
             maid.speedLoop = nil;
             return;
@@ -1055,7 +1114,7 @@ do
             local humanoid = localPlayerData.humanoid;
             if (not humanoid) then return end;
 
-            humanoid.WalkSpeed = library.flags.moveSpeed;
+            humanoid.WalkSpeed = library.flags.speedHackValue;
         end);
     end;
 
@@ -1107,38 +1166,55 @@ end;
 -- Add Features To UI
 localCheats:AddDivider('Movement');
 
-localCheats:AddToggle({text = 'Fly', callback = funcs.flyHack});
-
+localCheats:AddToggle({
+    text = 'Fly',
+    callback = funcs.fly
+});
 localCheats:AddSlider({
-    text = 'Fly Speed',
-    min = 0,
-    value = 50,
-    max = 500,
+    min = 16,
+    max = 250,
+    flag = 'Fly Hack Value',
     textpos = 2
 });
 
-localCheats:AddToggle({text = 'Fly Vertical', state = true, tip = 'Space to go up, Left Shift to go down.'});
+localCheats:AddToggle({
+    text = 'Fly Vertical',
+    state = true,
+    tip = 'Space to go up, Left Shift to go down.'
+});
 
-localCheats:AddToggle({text = 'Speed', callback = funcs.speed});
-
+localCheats:AddToggle({
+    text = 'Speedhack',
+    callback = funcs.speedHack
+});
 localCheats:AddSlider({
-    text = 'Move Speed',
-    min = 0,
-    value = 50,
-    max = 500,
+    min = 16,
+    max = 250,
+    flag = 'Speed Hack Value',
     textpos = 2
 });
 
-localCheats:AddToggle({text = 'Infinite Jump', callback = funcs.infiniteJump});
-localCheats:AddToggle({text = 'No Clip', callback = funcs.noClip});
+localCheats:AddToggle({
+    text = 'Infinite Jump',
+    callback = funcs.infiniteJump
+});
+
+localCheats:AddToggle({
+    text = 'No Clip',
+    callback = funcs.noClip
+});
 
 localCheats:AddDivider('Attach To Back');
 
 localCheats:AddBind({
     text = 'Attach To Back',
     mode = 'hold',
-    tip = 'Hold to tween onto the nearest entity.'
+    tip = 'Hold to tween onto the nearest enabled target.'
 });
+
+localCheats:AddToggle({text = 'Attach To Players', state = true});
+localCheats:AddToggle({text = 'Attach To Mobs', state = true});
+localCheats:AddToggle({text = 'Attach To Npcs', tip = 'Dialog NPCs. They never move, so this is off by default.'});
 
 localCheats:AddSlider({
     text = 'Attach To Back Height',
@@ -1228,6 +1304,10 @@ teleportCheats:AddButton({text = 'Teleport To', callback = funcs.teleportToChakr
 teleportCheats:AddDivider('NPCs');
 teleportCheats:AddList({text = 'NPCs', flag = 'NPC Teleport', values = npcs});
 teleportCheats:AddButton({text = 'Teleport To', callback = funcs.teleportToNPC});
+
+teleportCheats:AddDivider('Mobs');
+teleportCheats:AddList({text = 'Mobs', flag = 'Mob Teleport', values = mobs});
+teleportCheats:AddButton({text = 'Teleport To', callback = funcs.teleportToMob});
 
 teleportCheats:AddDivider('Players');
 teleportCheats:AddList({text = 'Players', flag = 'Player Teleport', playerOnly = true});
