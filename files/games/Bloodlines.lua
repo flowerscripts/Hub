@@ -69,7 +69,7 @@ local BOSS_HOP_TIME = 15;
     around the corpse for this long instead of leaving for the next boss. An occupied
     trinket spawn keeps it there up to the max, in case the drop is late
 ]]
-local REWARD_SPAWN_WAIT = 12;
+local REWARD_SPAWN_WAIT = 20;
 local REWARD_SPAWN_WAIT_MAX = 35;
 
 --[[
