@@ -49,18 +49,59 @@ local BOSS_NAMES = {
     'Manda', 'Matatabi', 'Samurai', 'Shukaku', 'Tairock', 'Wood Golem', 'Wooden Golem'
 };
 
+--[[
+    Every boss has a fixed swing cooldown, so clicking faster than this just gets
+    dropped by the server. Fast enough to never miss a window, no slider needed
+]]
+local AUTO_FARM_SWING_DELAY = 0.1;
+local AUTO_FARM_DEFAULT_HEIGHT = 8;
+local AUTO_FARM_DEFAULT_SPACE = 6;
+
 local RESPAWN_SETTLE_TIME = 1;
 local BOSS_SCAN_TIME = 8;
 local BOSS_HOP_TIME = 15;
+
 local bossLookup = {};
+local bossNames = {};
+
+-- Every boss is a different size, so each one remembers its own parking spot
+local bossOffsets = {};
 
 -- Boss names turn up spaced, unspaced, and with numbers tacked on, so only compare letters
 local function normalizeName(name)
     return string.lower((string.gsub(name, '%A', '')));
 end;
 
+local function getBossOffsets(bossName)
+    local key = normalizeName(bossName or '');
+
+    if (not bossOffsets[key]) then
+        bossOffsets[key] = {
+            height = AUTO_FARM_DEFAULT_HEIGHT,
+            space = AUTO_FARM_DEFAULT_SPACE
+        };
+    end;
+
+    return bossOffsets[key];
+end;
+
 local function addBossName(name)
-    bossLookup[normalizeName(name)] = true;
+    local key = normalizeName(name);
+    if (key == '' or bossLookup[key]) then return end;
+
+    bossLookup[key] = true;
+
+    -- Bosses we learn at runtime still need a row in the per boss config list
+    local bossList = library.options.autoFarmBoss;
+
+    if (bossList and bossList.hasInit) then
+        -- AddValue writes into bossNames itself, since the list shares the table
+        bossList:AddValue(name);
+    else
+        table.insert(bossNames, name);
+    end;
+
+    table.sort(bossNames);
 end;
 
 for _, bossName in next, BOSS_NAMES do
@@ -488,7 +529,7 @@ do
             end;
         end;
 
-        local function onPickupableAdded(object)
+        local function onPickupableAdded(object, isReward)
             local pickupable = object:WaitForChild('Pickupable', 10);
             if (not pickupable) then return end;
 
@@ -497,7 +538,8 @@ do
 
             pickupList[object] = {
                 id = id,
-                lastPickupAt = 0
+                lastPickupAt = 0,
+                isReward = isReward
             };
 
             local itemESP = itemsESP.new(object, object.Name);
@@ -541,7 +583,7 @@ do
 
             maid[model] = Utility.listenToDescendantAdded(model, function(object)
                 if (IsA(object, 'BasePart')) then
-                    task.spawn(onPickupableAdded, object);
+                    task.spawn(onPickupableAdded, object, true);
                 end;
             end);
 
@@ -608,13 +650,36 @@ do
             rootPart.CFrame = CFrame.new(closest.Position + Vector3.new(0, 0, -5), closest.Position);
         end;
 
+        -- The server ignores a second PickUp on the same item this quickly
+        local PICKUP_COOLDOWN = 1;
+
+        --[[
+            Sweeps up what a boss dropped. The PickUp remote is range checked server
+            side, so we walk the root part onto each trinket before asking for it
+        ]]
+        local function collectRewardDrops(myRootPart)
+            for object, data in next, pickupList do
+                if (not data.isReward or not object.Parent) then continue end;
+                if (tick() - data.lastPickupAt < PICKUP_COOLDOWN) then continue end;
+
+                data.lastPickupAt = tick();
+
+                myRootPart.CFrame = CFrame.new(object.Position);
+                task.wait();
+
+                dataEvent:FireServer('PickUp', data.id.Value);
+
+                myRootPart = localPlayerData.rootPart;
+                if (not myRootPart or not library.flags.autoFarm) then return end;
+            end;
+        end;
+
         function funcs.autoPickup(state)
             if (not state) then
                 maid.autoPickup = nil;
                 return;
             end;
 
-            local PICKUP_COOLDOWN = 1;
             local lastRanAt = 0;
 
             maid.autoPickup = RunService.Heartbeat:Connect(function()
@@ -684,10 +749,11 @@ do
         --[[
             Where to sit relative to a target. The offset is applied in the target's
             own space, then we pitch/yaw straight at them so hitboxes still line up
-            when the height offset puts us above or below them
+            when the height offset puts us above or below them. Attach to back and
+            auto farm keep their own offsets, since farming wants more breathing room
         ]]
-        local function getAttachCFrame(targetCF)
-            local offsetCF = targetCF * CFrame.new(0, library.flags.attachToBackHeight, library.flags.attachToBackSpace);
+        local function getAttachCFrame(targetCF, height, space)
+            local offsetCF = targetCF * CFrame.new(0, height, space);
             local goalPos = offsetCF.Position;
             local toTarget = targetCF.Position - goalPos;
 
@@ -814,7 +880,7 @@ do
                     return;
                 end;
 
-                local goalCF = getAttachCFrame(closest.CFrame);
+                local goalCF = getAttachCFrame(closest.CFrame, library.flags.attachToBackHeight, library.flags.attachToBackSpace);
                 movers.apply(rootPart, goalCF);
 
                 local distance = (goalCF.Position - rootPart.Position).Magnitude;
@@ -841,23 +907,25 @@ do
             maid.attachToBackMovers = nil;
         end);
 
-        -- Picks the nearest living mob that passes the auto farm filters
+        --[[
+            Picks the nearest living boss anywhere in the server. Regular mobs are
+            never worth the swings, and there's no range limit because we teleport
+            onto the target anyway
+        ]]
         local function getFarmTarget(myPosition)
-            local bossesOnly = library.flags.autoFarmBossesOnly;
-            local maxDistance = library.flags.autoFarmRange;
             local closest, closestDistance = nil, math.huge;
 
             for rootPart, kind in next, attachTargets do
                 local model = rootPart.Parent;
                 if (kind ~= 'mob' or not model) then continue end;
-                if (bossesOnly and not bossLookup[normalizeName(model.Name)]) then continue end;
+                if (not bossLookup[normalizeName(model.Name)]) then continue end;
 
                 local humanoid = FindFirstChildWhichIsA(model, 'Humanoid');
                 if (not humanoid or humanoid.Health <= 0) then continue end;
 
                 local distance = (rootPart.Position - myPosition).Magnitude;
 
-                if (distance < maxDistance and distance < closestDistance) then
+                if (distance < closestDistance) then
                     closest, closestDistance = rootPart, distance;
                 end;
             end;
@@ -901,7 +969,8 @@ do
                     local target = myRootPart and getFarmTarget(myRootPart.Position);
 
                     if (target) then
-                        local goalCF = getAttachCFrame(target.CFrame);
+                        local offsets = getBossOffsets(target.Parent and target.Parent.Name);
+                        local goalCF = getAttachCFrame(target.CFrame, offsets.height, offsets.space);
 
                         lastFarmPosition = target.Position;
                         movers.apply(myRootPart, goalCF);
@@ -910,12 +979,13 @@ do
                         VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0);
                         task.wait();
                         VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0);
-                    else
-                        -- Nothing to hit, so let go and fall/walk like normal
+                    elseif (myRootPart) then
+                        -- Nothing left to hit, so let go and go bank what the boss dropped
                         movers.clear();
+                        collectRewardDrops(myRootPart);
                     end;
 
-                    task.wait(library.flags.autoFarmDelay);
+                    task.wait(AUTO_FARM_SWING_DELAY);
                 end;
             end);
         end;
@@ -1530,35 +1600,67 @@ localCheats:AddDivider('Auto Farm');
 localCheats:AddToggle({
     text = 'Auto Farm',
     callback = funcs.autoFarm,
-    tip = 'Parks on the nearest mob and left clicks. Uses the Attach To Back height/space offsets.'
+    tip = 'Parks on the nearest living boss anywhere in the server and left clicks.'
 });
 
-localCheats:AddToggle({
-    text = 'Auto Farm Bosses Only',
-    tip = 'Only targets Lavarossa, Wood Golem and Chakra Knight.'
+--[[
+    The height/space sliders edit whichever boss is picked here, so you can tune a
+    parking spot per boss and switch between them without losing the last one
+]]
+localCheats:AddList({
+    text = 'Auto Farm Boss',
+    values = bossNames,
+    tip = 'Which boss the height and space sliders below belong to.',
+    callback = function(bossName)
+        local heightSlider, spaceSlider = library.options.autoFarmHeight, library.options.autoFarmSpace;
+
+        -- This can fire while the menu is still building, before the sliders are drawn
+        if (not heightSlider or not heightSlider.SetValue or not spaceSlider) then return end;
+
+        local offsets = getBossOffsets(bossName);
+
+        heightSlider:SetValue(offsets.height, true);
+        spaceSlider:SetValue(offsets.space, true);
+    end
 });
 
-localCheats:AddSlider({
-    text = 'Auto Farm Range',
-    min = 10,
-    value = 150,
-    max = 500,
-    textpos = 2
+local autoFarmHeightSlider = localCheats:AddSlider({
+    text = 'Auto Farm Height',
+    min = -100,
+    max = 100,
+    textpos = 2,
+    tip = 'How far above the selected boss to sit. We still aim down at it.',
+    callback = function(value)
+        getBossOffsets(library.flags.autoFarmBoss).height = value;
+    end
 });
 
-localCheats:AddSlider({
-    text = 'Auto Farm Delay',
-    min = 0.05,
-    value = 0.4,
-    max = 3,
-    float = 0.05,
-    textpos = 2
+local autoFarmSpaceSlider = localCheats:AddSlider({
+    text = 'Auto Farm Space',
+    min = -100,
+    max = 100,
+    textpos = 2,
+    tip = 'How far behind the selected boss to park. Raise it if you end up inside it.',
+    callback = function(value)
+        getBossOffsets(library.flags.autoFarmBoss).space = value;
+    end
 });
+
+--[[
+    The library pins any slider with a negative min to 0, so seed the real defaults
+    straight onto the options. They're picked up by the deferred init, or overwritten
+    by your config if you saved one
+]]
+autoFarmHeightSlider.value = AUTO_FARM_DEFAULT_HEIGHT;
+autoFarmSpaceSlider.value = AUTO_FARM_DEFAULT_SPACE;
+
+library.flags[autoFarmHeightSlider.flag] = AUTO_FARM_DEFAULT_HEIGHT;
+library.flags[autoFarmSpaceSlider.flag] = AUTO_FARM_DEFAULT_SPACE;
 
 localCheats:AddToggle({
     text = 'Auto Farm Return On Death',
     state = true,
-    tip = 'Teleports back to the last mob you hit after respawning.'
+    tip = 'Teleports back to the last boss you hit after respawning.'
 });
 
 localCheats:AddToggle({
@@ -1657,7 +1759,7 @@ miscCheats:AddToggle({text = 'Thunderstorm Server Finder', callback = funcs.find
 miscCheats:AddToggle({
     text = 'Boss Server Finder',
     callback = funcs.findBossServer,
-    tip = 'Hops until a server has Lavarossa, Wood Golem or Chakra Knight spawned.'
+    tip = 'Hops until a server has one of the known bosses spawned.'
 });
 
 miscCheats:AddButton({text = 'Server Hop', callback = funcs.serverHop});
