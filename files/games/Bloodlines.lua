@@ -1614,7 +1614,9 @@ do
             ]]
             local rewardDeadline = 0;
             local rewardHardDeadline = 0;
-            local hadTarget = false;
+
+            -- The boss we're currently swinging at, so we notice the moment it dies
+            local lastTarget;
 
             -- True while we're sitting in the sky waiting on regen
             local retreating = false;
@@ -1688,6 +1690,25 @@ do
                         continue;
                     end;
 
+                    --[[
+                        Watch the boss we were actually hitting rather than waiting for the
+                        target list to run dry. With another boss alive somewhere getFarmTarget
+                        hands one straight back, which is how kills used to end in an instant
+                        teleport across the map with the loot left behind
+                    ]]
+                    if (lastTarget) then
+                        local model = lastTarget.Parent;
+                        local humanoid = model and FindFirstChildWhichIsA(model, 'Humanoid');
+
+                        if (not model or not humanoid or humanoid.Health <= 0) then
+                            lastTarget = nil;
+                            rewardDeadline = os.clock() + REWARD_SPAWN_WAIT;
+                            rewardHardDeadline = os.clock() + REWARD_SPAWN_WAIT_MAX;
+
+                            movers.clear();
+                        end;
+                    end;
+
                     -- While the last kill still owes us trinkets we don't go looking for a new boss
                     local waitingForRewards = os.clock() < rewardDeadline
                         or (os.clock() < rewardHardDeadline and hasPendingRewards());
@@ -1701,20 +1722,14 @@ do
                         -- An m1 cancels the grip animation, so let it finish first
                     elseif (target) then
                         lastFarmPosition = target.Position;
-                        hadTarget = true;
+                        lastTarget = target;
 
                         VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0);
                         task.wait();
                         VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0);
                     elseif (myRootPart) then
-                        -- Nothing left to hit, so let go and go bank what the boss dropped
+                        -- Nothing to hit, so let go and go bank what the boss dropped
                         movers.clear();
-
-                        if (hadTarget) then
-                            hadTarget = false;
-                            rewardDeadline = os.clock() + REWARD_SPAWN_WAIT;
-                            rewardHardDeadline = os.clock() + REWARD_SPAWN_WAIT_MAX;
-                        end;
 
                         --[[
                             Only loot inside the window after a kill. Looting on any idle
