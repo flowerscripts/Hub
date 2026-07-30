@@ -72,8 +72,15 @@ local REWARD_SPAWN_WAIT = 10;
 
 --[[
     Safe Teleport. Animation ids we bail out on, filled from the Teleport Animation Ids
-    box or straight off a row in the animation logger
+    box or straight off a row in the animation logger. The defaults are Wooden Golem's
+    three slams
 ]]
+local DEFAULT_TELEPORT_ANIMATIONS = '111592213267733, 116907126244057, 120758909308511';
+
+local SAFE_TELEPORT_STEP = 0.1;
+local SAFE_TELEPORT_BUFFER = 0.35;
+local SAFE_TELEPORT_MAX_TIME = 15;
+
 local coverAnimations = {};
 
 --[[
@@ -89,6 +96,42 @@ local function setBlockSounds(text)
     for soundName in string.gmatch(text or '', '[%w_]+') do
         blockSounds[soundName] = true;
     end;
+end;
+
+--[[
+    Auto Parry. Animations that get blocked the instant they start rather than on a
+    sound cue. The default is Haku's parryable
+]]
+local DEFAULT_PARRY_ANIMATIONS = '7298826950';
+local PARRY_MIN_HOLD = 0.3;
+
+local parryAnimations = {};
+
+local function setParryAnimations(text)
+    table.clear(parryAnimations);
+
+    for animId in string.gmatch(text or '', '%d+') do
+        parryAnimations[animId] = true;
+    end;
+end;
+
+local function addParryAnimation(animId)
+    if (not animId or parryAnimations[animId]) then return end;
+
+    parryAnimations[animId] = true;
+
+    -- Mirror it back into the box so the config remembers it next session
+    local box = library.options.parryAnimationIds;
+    if (not box or not box.SetValue) then return end;
+
+    local ids = {};
+
+    for id in next, parryAnimations do
+        table.insert(ids, id);
+    end;
+
+    table.sort(ids);
+    box:SetValue(table.concat(ids, ', '));
 end;
 
 local function setCoverAnimations(text)
@@ -227,7 +270,7 @@ local chatLogger = TextLogger.new({
 
 local animLogger = TextLogger.new({
     title = 'Animation Logger',
-    buttons = {'Copy Animation Id', 'Add To Teleport List', 'Add To Ignore List', 'Delete Log', 'Clear All'}
+    buttons = {'Copy Animation Id', 'Add To Parry List', 'Add To Teleport List', 'Add To Ignore List', 'Delete Log', 'Clear All'}
 });
 
 animLogger.ignoreList = {};
@@ -659,17 +702,46 @@ do
         ]]
         local coverUntil = 0;
 
-        local function takeCover(rootPart)
+        local function moveBehind(rootPart)
             local myRootPart = localPlayerData.rootPart;
-            if (not myRootPart or not rootPart.Parent) then return end;
-
-            coverUntil = os.clock() + library.flags.safeTeleportTime;
+            if (not myRootPart or not rootPart.Parent) then return false end;
 
             -- Behind them in their own space, so we end up out of the swing arc
             local goalPos = (rootPart.CFrame * CFrame.new(0, library.flags.safeTeleportHeight, library.flags.safeTeleportDistance)).Position;
 
             -- Keep facing them so we can read the next move and swing the moment we're back
             myRootPart.CFrame = CFrame.lookAt(goalPos, rootPart.Position);
+
+            return true;
+        end;
+
+        local function takeCover(rootPart, animationTrack)
+            if (not moveBehind(rootPart)) then return end;
+
+            -- Safe Teleport Time is the minimum stay, the animation itself extends it
+            coverUntil = os.clock() + library.flags.safeTeleportTime;
+
+            if (not animationTrack) then return end;
+
+            --[[
+                Ride the animation out instead of guessing at a duration, following the
+                boss's back the whole way in case it turns or walks through us. The cap
+                is there for tracks that never report stopping
+            ]]
+            task.spawn(function()
+                local deadline = os.clock() + SAFE_TELEPORT_MAX_TIME;
+
+                while (animationTrack.IsPlaying and library.flags.safeTeleport and os.clock() < deadline) do
+                    coverUntil = math.max(coverUntil, os.clock() + SAFE_TELEPORT_BUFFER);
+
+                    if (not moveBehind(rootPart)) then break end;
+
+                    task.wait(SAFE_TELEPORT_STEP);
+                end;
+
+                -- One last beat so we aren't swinging into the tail of the move
+                coverUntil = math.max(coverUntil, os.clock() + SAFE_TELEPORT_BUFFER);
+            end);
         end;
 
         local function isTakingCover()
@@ -744,6 +816,61 @@ do
             end);
         end;
 
+        --[[
+            Auto Block. Dangerous moves announce themselves before they land, either with
+            a sound (Manda's SnakeBite, anyone's HeavyPunchCharge) or with a wind up
+            animation (Haku's parryable), so block goes down the frame we see one and
+            stays down until it's over
+        ]]
+        local blockHolds = 0;
+
+        -- Binds can be a key or a mouse button, so send whichever the user picked
+        local function setBlockHeld(held)
+            local bind = library.options.blockKey;
+            local key = bind and bind.key;
+            if (not key) then return end;
+
+            if (key == 'MouseButton1' or key == 'MouseButton2') then
+                VirtualInputManager:SendMouseButtonEvent(0, 0, key == 'MouseButton1' and 0 or 1, held, game, 0);
+                return;
+            end;
+
+            local gotKeyCode, keyCode = pcall(function()
+                return Enum.KeyCode[key];
+            end);
+
+            if (not gotKeyCode or not keyCode) then return end;
+
+            VirtualInputManager:SendKeyEvent(held, keyCode, false, game);
+        end;
+
+        --[[
+            Presses block right away and holds it until isStillGoing() says the threat is
+            over. Reference counted so two overlapping threats can't release each other
+            early, and capped so a threat that vanishes mid-swing never sticks block down
+        ]]
+        local function holdBlockWhile(isStillGoing, minHoldTime)
+            blockHolds += 1;
+
+            if (blockHolds == 1) then
+                setBlockHeld(true);
+            end;
+
+            local deadline = os.clock() + library.flags.autoBlockMaxTime;
+            local minUntil = os.clock() + (minHoldTime or 0);
+
+            repeat
+                task.wait(0.05);
+            until ((os.clock() >= minUntil and not isStillGoing()) or os.clock() > deadline);
+
+            blockHolds -= 1;
+
+            if (blockHolds <= 0) then
+                blockHolds = 0;
+                setBlockHeld(false);
+            end;
+        end;
+
         -- One hook per entity, shared by the animation logger, safe teleport and auto block
         local function onAnimationPlayed(object, rootPart, animationTrack)
             local animation = animationTrack.Animation;
@@ -755,8 +882,18 @@ do
             local distance = (myRootPart.Position - rootPart.Position).Magnitude;
             local kind = attachTargets[rootPart] or 'player';
 
+            --[[
+                Parries come first and without a task.spawn wrapper around the decision,
+                so block is already down by the time this frame ends
+            ]]
+            if (library.flags.autoBlock and parryAnimations[animId] and distance <= library.flags.autoBlockRange) then
+                task.spawn(holdBlockWhile, function()
+                    return animationTrack.IsPlaying and library.flags.autoBlock;
+                end, PARRY_MIN_HOLD);
+            end;
+
             if (library.flags.safeTeleport and kind == 'mob' and coverAnimations[animId] and distance <= library.flags.safeTeleportRange) then
-                takeCover(rootPart);
+                takeCover(rootPart, animationTrack);
             end;
 
             if (not library.flags.animationLogger) then return end;
@@ -792,33 +929,6 @@ do
             end);
         end;
 
-        --[[
-            Auto Block. The dangerous moves announce themselves with a sound before they
-            land (Manda's SnakeBite, anyone's HeavyPunchCharge), so hold block for as
-            long as that sound is playing near us
-        ]]
-        local blockHolds = 0;
-
-        -- Binds can be a key or a mouse button, so send whichever the user picked
-        local function setBlockHeld(held)
-            local bind = library.options.blockKey;
-            local key = bind and bind.key;
-            if (not key) then return end;
-
-            if (key == 'MouseButton1' or key == 'MouseButton2') then
-                VirtualInputManager:SendMouseButtonEvent(0, 0, key == 'MouseButton1' and 0 or 1, held, game, 0);
-                return;
-            end;
-
-            local gotKeyCode, keyCode = pcall(function()
-                return Enum.KeyCode[key];
-            end);
-
-            if (not gotKeyCode or not keyCode) then return end;
-
-            VirtualInputManager:SendKeyEvent(held, keyCode, false, game);
-        end;
-
         -- Sounds hang off parts, attachments or the model itself depending on the move
         local function getSoundPosition(sound)
             local parent = sound.Parent;
@@ -840,31 +950,6 @@ do
             return nil;
         end;
 
-        local function holdBlockFor(sound)
-            blockHolds += 1;
-
-            if (blockHolds == 1) then
-                setBlockHeld(true);
-            end;
-
-            --[[
-                Released when the sound stops. The time cap is there so a sound that gets
-                destroyed mid-playback can never leave block stuck down
-            ]]
-            local deadline = os.clock() + library.flags.autoBlockMaxTime;
-
-            repeat
-                task.wait(0.05);
-            until (not sound.Parent or not sound.IsPlaying or not library.flags.autoBlock or os.clock() > deadline);
-
-            blockHolds -= 1;
-
-            if (blockHolds <= 0) then
-                blockHolds = 0;
-                setBlockHeld(false);
-            end;
-        end;
-
         local function onSoundPlayed(sound)
             if (not library.flags.autoBlock or not blockSounds[sound.Name]) then return end;
 
@@ -879,7 +964,10 @@ do
             end;
 
             ToastNotif.new({text = string.format('Blocking %s.', sound.Name)});
-            task.spawn(holdBlockFor, sound);
+
+            task.spawn(holdBlockWhile, function()
+                return sound.Parent and sound.IsPlaying and library.flags.autoBlock;
+            end);
         end;
 
         local function onSoundAdded(object)
@@ -923,6 +1011,9 @@ do
         animLogger.OnClick:Connect(function(action, context)
             if (action == 'Copy Animation Id') then
                 setclipboard(context.animationId);
+            elseif (action == 'Add To Parry List') then
+                addParryAnimation(context.animationId);
+                ToastNotif.new({text = string.format('Blocking animation %s from now on.', context.animationId)});
             elseif (action == 'Add To Teleport List') then
                 addCoverAnimation(context.animationId);
                 ToastNotif.new({text = string.format('Teleporting away from animation %s from now on.', context.animationId)});
@@ -2127,6 +2218,7 @@ localCheats:AddToggle({
 
 localCheats:AddBox({
     text = 'Teleport Animation Ids',
+    value = DEFAULT_TELEPORT_ANIMATIONS,
     tip = 'Animation ids to run from, comma separated. Grab them from the Animation Logger.',
     callback = setCoverAnimations
 });
@@ -2186,6 +2278,13 @@ localCheats:AddBox({
     value = DEFAULT_BLOCK_SOUNDS,
     tip = 'Sound names to block through, comma separated. They sit under the target\'s root part.',
     callback = setBlockSounds
+});
+
+localCheats:AddBox({
+    text = 'Parry Animation Ids',
+    value = DEFAULT_PARRY_ANIMATIONS,
+    tip = 'Animation ids to block the instant they start, comma separated. Defaults to Haku\'s.',
+    callback = setParryAnimations
 });
 
 localCheats:AddSlider({
