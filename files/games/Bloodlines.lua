@@ -41,9 +41,14 @@ local MAIN_PLACE_ID = 10266164381;
 local ATTACH_MAX_RANGE = 300;
 local ATTACH_TWEEN_SPEED = 100;
 local ATTACH_MIN_STEP = 0.5;
+local ATTACH_MOVER_FORCE = Vector3.new(1e9, 1e9, 1e9);
 
 -- Auto Farm
-local BOSS_NAMES = {'Lavarossa', 'Wood Golem', 'Chakra Knight', 'Haku', 'Hyuga'};
+local BOSS_NAMES = {
+    'Barbarit', 'Chakra Knight', 'Haku', 'Hyuga', 'Isobu', 'Lava Snake', 'Lavarossa',
+    'Manda', 'Matatabi', 'Samurai', 'Shukaku', 'Tairock', 'Wood Golem', 'Wooden Golem'
+};
+
 local RESPAWN_SETTLE_TIME = 1;
 local BOSS_SCAN_TIME = 8;
 local BOSS_HOP_TIME = 15;
@@ -54,8 +59,12 @@ local function normalizeName(name)
     return string.lower((string.gsub(name, '%A', '')));
 end;
 
+local function addBossName(name)
+    bossLookup[normalizeName(name)] = true;
+end;
+
 for _, bossName in next, BOSS_NAMES do
-    bossLookup[normalizeName(bossName)] = true;
+    addBossName(bossName);
 end;
 
 if (game.PlaceId ~= MAIN_PLACE_ID) then
@@ -518,6 +527,29 @@ do
             end);
         end;
 
+        --[[
+            Killing a boss drops a <BossName>Rewards model with the loot nested under
+            TrinketSpawn parts, so those pickupables never hit workspace directly and
+            the item ESP / auto pickup would never see them
+        ]]
+        local function onRewardsAdded(model)
+            local bossName = string.match(model.Name, '^(.+)Rewards$');
+            if (not bossName) then return end;
+
+            -- Every rewards drop is named after a boss, so learn names we didn't hardcode
+            addBossName((string.gsub(bossName, '%s*[Bb]oss%s*$', '')));
+
+            maid[model] = Utility.listenToDescendantAdded(model, function(object)
+                if (IsA(object, 'BasePart')) then
+                    task.spawn(onPickupableAdded, object);
+                end;
+            end);
+
+            model.Destroying:Connect(function()
+                maid[model] = nil;
+            end);
+        end;
+
         local function onWorkspaceChildAdded(object)
             if (IsA(object, 'BasePart')) then
                 return onPickupableAdded(object);
@@ -525,6 +557,7 @@ do
 
             if (not IsA(object, 'Model')) then return end;
 
+            task.spawn(onRewardsAdded, object);
             task.spawn(onNpcAdded, object);
             task.spawn(onEntityAdded, object);
         end;
@@ -673,6 +706,76 @@ do
             return CFrame.lookAt(goalPos, targetCF.Position, up);
         end;
 
+        --[[
+            Snapping the root part around every frame leaves the character with
+            leftover momentum and the humanoid fighting us over the rotation, which
+            is what makes it flail and slide off. A zero velocity BodyVelocity eats
+            the momentum and a BodyGyro pins the orientation we picked, so the pitch
+            onto the target holds instead of being levelled out
+        ]]
+        local function createAttachMovers(rootPart)
+            local bodyVelocity = Instance.new('BodyVelocity');
+            bodyVelocity.Name = 'AttachVelocity';
+            bodyVelocity.Velocity = Vector3.zero;
+            bodyVelocity.MaxForce = ATTACH_MOVER_FORCE;
+            bodyVelocity.P = 10000;
+            bodyVelocity.Parent = rootPart;
+
+            local bodyGyro = Instance.new('BodyGyro');
+            bodyGyro.Name = 'AttachGyro';
+            bodyGyro.MaxTorque = ATTACH_MOVER_FORCE;
+            bodyGyro.P = 300000;
+            bodyGyro.D = 1000;
+            bodyGyro.CFrame = rootPart.CFrame;
+            bodyGyro.Parent = rootPart;
+
+            return bodyVelocity, bodyGyro;
+        end;
+
+        -- Keeps one pair of movers alive on whatever root part we currently own
+        local function createMoverPool()
+            local pool = {};
+            local currentRootPart, bodyVelocity, bodyGyro, humanoid;
+
+            function pool.apply(rootPart, goalCF)
+                -- Respawning hands us a brand new root part, so rebuild on it
+                if (rootPart ~= currentRootPart or not bodyGyro or not bodyGyro.Parent) then
+                    pool.clear();
+
+                    currentRootPart = rootPart;
+                    bodyVelocity, bodyGyro = createAttachMovers(rootPart);
+
+                    -- Auto rotate would snap our yaw back off the target on any movement input
+                    humanoid = localPlayerData.humanoid;
+
+                    if (humanoid) then
+                        humanoid.AutoRotate = false;
+                    end;
+                end;
+
+                bodyVelocity.Velocity = Vector3.zero;
+                bodyGyro.CFrame = goalCF;
+            end;
+
+            function pool.clear()
+                if (bodyVelocity) then
+                    bodyVelocity:Destroy();
+                end;
+
+                if (bodyGyro) then
+                    bodyGyro:Destroy();
+                end;
+
+                if (humanoid and humanoid.Parent) then
+                    humanoid.AutoRotate = true;
+                end;
+
+                currentRootPart, bodyVelocity, bodyGyro, humanoid = nil, nil, nil, nil;
+            end;
+
+            return pool;
+        end;
+
         library.OnKeyPress:Connect(function(input, gpe)
             if (gpe or not library.options.attachToBack) then return end;
 
@@ -694,17 +797,10 @@ do
 
             if (not closest or input.UserInputState == Enum.UserInputState.End) then return end;
 
-            -- Auto rotate would keep snapping our yaw back whenever we hold a movement key
-            local humanoid = localPlayerData.humanoid;
+            local movers = createMoverPool();
 
-            if (humanoid) then
-                humanoid.AutoRotate = false;
-
-                maid.attachToBackRotate = function()
-                    if (humanoid.Parent) then
-                        humanoid.AutoRotate = true;
-                    end;
-                end;
+            maid.attachToBackMovers = function()
+                movers.clear();
             end;
 
             maid.attachToBack = RunService.Heartbeat:Connect(function()
@@ -714,11 +810,13 @@ do
                 if (not rootPart or not closest.Parent) then
                     maid.attachToBack = nil;
                     maid.attachToBackTween = nil;
-                    maid.attachToBackRotate = nil;
+                    maid.attachToBackMovers = nil;
                     return;
                 end;
 
                 local goalCF = getAttachCFrame(closest.CFrame);
+                movers.apply(rootPart, goalCF);
+
                 local distance = (goalCF.Position - rootPart.Position).Magnitude;
                 local tween = TweenService:Create(rootPart, TweenInfo.new(distance / ATTACH_TWEEN_SPEED, Enum.EasingStyle.Linear), {
                     CFrame = goalCF
@@ -740,7 +838,7 @@ do
 
             maid.attachToBack = nil;
             maid.attachToBackTween = nil;
-            maid.attachToBackRotate = nil;
+            maid.attachToBackMovers = nil;
         end);
 
         -- Picks the nearest living mob that passes the auto farm filters
@@ -778,7 +876,14 @@ do
         function funcs.autoFarm(state)
             if (not state) then
                 maid.autoFarm = nil;
+                maid.autoFarmMovers = nil;
                 return;
+            end;
+
+            local movers = createMoverPool();
+
+            maid.autoFarmMovers = function()
+                movers.clear();
             end;
 
             maid.autoFarm = task.spawn(function()
@@ -796,12 +901,18 @@ do
                     local target = myRootPart and getFarmTarget(myRootPart.Position);
 
                     if (target) then
+                        local goalCF = getAttachCFrame(target.CFrame);
+
                         lastFarmPosition = target.Position;
-                        myRootPart.CFrame = getAttachCFrame(target.CFrame);
+                        movers.apply(myRootPart, goalCF);
+                        myRootPart.CFrame = goalCF;
 
                         VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0);
                         task.wait();
                         VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0);
+                    else
+                        -- Nothing to hit, so let go and fall/walk like normal
+                        movers.clear();
                     end;
 
                     task.wait(library.flags.autoFarmDelay);
@@ -1282,17 +1393,29 @@ do
         end);
     end;
 
-    function funcs.speedHack(state)
-        if (not state) then
-            maid.speedLoop = nil;
+    function funcs.speedHack(toggle)
+         if (not toggle) then
+            maid.speedHack = nil;
+            maid.speedHackBv = nil;
+
             return;
         end;
 
-        maid.speedLoop = RunService.Stepped:Connect(function()
-            local humanoid = localPlayerData.humanoid;
-            if (not humanoid) then return end;
+        maid.speedHack = RunService.Heartbeat:Connect(function()
+            local playerData = Utility:getPlayerData();
+            local humanoid, rootPart = playerData.humanoid, playerData.primaryPart;
+            if (not humanoid or not rootPart) then return end;
 
-            humanoid.WalkSpeed = library.flags.speedHackValue;
+            if (library.flags.fly) then
+                maid.speedHackBv = nil;
+                return;
+            end;
+
+            maid.speedHackBv = maid.speedHackBv or Instance.new('BodyVelocity');
+            maid.speedHackBv.MaxForce = Vector3.new(100000, 0, 100000);
+
+            maid.speedHackBv.Parent = not library.flags.fly and rootPart or nil;
+            maid.speedHackBv.Velocity = (humanoid.MoveDirection.Magnitude ~= 0 and humanoid.MoveDirection or gethiddenproperty(humanoid, 'WalkDirection')) * library.flags.speedHackValue;
         end);
     end;
 
