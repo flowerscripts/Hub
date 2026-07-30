@@ -46,7 +46,7 @@ local ATTACH_MOVER_FORCE = Vector3.new(1e9, 1e9, 1e9);
 -- Auto Farm
 local BOSS_NAMES = {
     'Barbarit', 'Chakra Knight', 'Haku', 'Hyuga', 'Isobu', 'Lava Snake', 'Lavarossa',
-    'Manda', 'Matatabi', 'Samurai', 'Shukaku', 'Tairock', 'Wooden Golem'
+    'Matatabi', 'Samurai', 'Shukaku', 'Tairock', 'Wooden Golem'
 };
 
 --[[
@@ -71,6 +71,12 @@ local BOSS_HOP_TIME = 15;
 ]]
 local REWARD_SPAWN_WAIT = 12;
 local REWARD_SPAWN_WAIT_MAX = 35;
+
+--[[
+    A rewards model lands on the corpse, so anything this far from where the boss died
+    belongs to a different kill and is none of our business
+]]
+local REWARD_COLLECT_RADIUS = 300;
 
 --[[
     Safe Teleport. Animation ids we bail out on, filled from the Teleport Animation Ids
@@ -1273,9 +1279,20 @@ do
             return data.occupied and part.Parent and data.visits < TRINKET_MAX_VISITS;
         end;
 
-        local function hasPendingRewards()
+        --[[
+            Other bosses have their own rewards models sitting in the workspace, often with
+            somebody else's loot on them, so collection is fenced to the area around the
+            boss we actually killed
+        ]]
+        local function isOurDrop(part, killPosition)
+            if (not killPosition) then return true end;
+
+            return (part.Position - killPosition).Magnitude <= REWARD_COLLECT_RADIUS;
+        end;
+
+        local function hasPendingRewards(killPosition)
             for part, data in next, trinketSpawns do
-                if (isWorthVisiting(part, data)) then return true end;
+                if (isWorthVisiting(part, data) and isOurDrop(part, killPosition)) then return true end;
             end;
 
             return false;
@@ -1286,9 +1303,10 @@ do
             value is the only reliable sign loot actually landed there, then anything
             that also registered as a normal pickupable gets asked for by id
         ]]
-        local function collectRewardDrops(myRootPart)
+        local function collectRewardDrops(myRootPart, killPosition)
             for part, data in next, trinketSpawns do
                 if (not isWorthVisiting(part, data)) then continue end;
+                if (not isOurDrop(part, killPosition)) then continue end;
                 if (os.clock() - data.lastVisitAt < TRINKET_REVISIT_COOLDOWN) then continue end;
 
                 data.lastVisitAt = os.clock();
@@ -1305,6 +1323,7 @@ do
 
             for object, data in next, pickupList do
                 if (not data.isReward or not object.Parent) then continue end;
+                if (not isOurDrop(object, killPosition)) then continue end;
                 if (tick() - data.lastPickupAt < PICKUP_COOLDOWN) then continue end;
 
                 data.lastPickupAt = tick();
@@ -1630,6 +1649,9 @@ do
             -- The boss we're currently swinging at, so we notice the moment it dies
             local lastTarget;
 
+            -- Where it died, which is where its rewards model lands
+            local killPosition;
+
             -- True while we're sitting in the sky waiting on regen
             local retreating = false;
 
@@ -1713,7 +1735,10 @@ do
                         local humanoid = model and FindFirstChildWhichIsA(model, 'Humanoid');
 
                         if (not model or not humanoid or humanoid.Health <= 0) then
+                            -- The rewards model lands on the corpse, so this is what we search around
+                            killPosition = lastTarget.Parent and lastTarget.Position or lastFarmPosition;
                             lastTarget = nil;
+
                             rewardDeadline = os.clock() + REWARD_SPAWN_WAIT;
                             rewardHardDeadline = os.clock() + REWARD_SPAWN_WAIT_MAX;
 
@@ -1723,7 +1748,7 @@ do
 
                     -- While the last kill still owes us trinkets we don't go looking for a new boss
                     local waitingForRewards = os.clock() < rewardDeadline
-                        or (os.clock() < rewardHardDeadline and hasPendingRewards());
+                        or (os.clock() < rewardHardDeadline and hasPendingRewards(killPosition));
                     target = (not waitingForRewards) and myRootPart and getFarmTarget(myRootPart.Position) or nil;
 
                     if (isTakingCover()) then
@@ -1748,7 +1773,7 @@ do
                             tick is what turned old occupied spawns into an endless tour
                         ]]
                         if (os.clock() < rewardHardDeadline) then
-                            collectRewardDrops(myRootPart);
+                            collectRewardDrops(myRootPart, killPosition);
                         end;
                     end;
 
