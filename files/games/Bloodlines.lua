@@ -24,7 +24,7 @@ local Webhook = sharedRequire('utils/Webhook.lua');
 local cloneref = cloneref or function(object) return object end;
 
 -- Services
-local Players, ReplicatedStorage, RunService, UserInputService, Lighting, MemStorageService, TeleportService, HttpService, TweenService = Services:Get('Players', 'ReplicatedStorage', 'RunService', 'UserInputService', 'Lighting', 'MemStorageService', 'TeleportService', 'HttpService', 'TweenService');
+local Players, ReplicatedStorage, RunService, UserInputService, Lighting, MemStorageService, TeleportService, HttpService, TweenService, VirtualInputManager = Services:Get('Players', 'ReplicatedStorage', 'RunService', 'UserInputService', 'Lighting', 'MemStorageService', 'TeleportService', 'HttpService', 'TweenService', 'VirtualInputManager');
 
 Players = cloneref(Players);
 ReplicatedStorage = cloneref(ReplicatedStorage);
@@ -33,6 +33,7 @@ UserInputService = cloneref(UserInputService);
 Lighting = cloneref(Lighting);
 TeleportService = cloneref(TeleportService);
 TweenService = cloneref(TweenService);
+VirtualInputManager = cloneref(VirtualInputManager);
 
 local MAIN_PLACE_ID = 10266164381;
 
@@ -40,6 +41,22 @@ local MAIN_PLACE_ID = 10266164381;
 local ATTACH_MAX_RANGE = 300;
 local ATTACH_TWEEN_SPEED = 100;
 local ATTACH_MIN_STEP = 0.5;
+
+-- Auto Farm
+local BOSS_NAMES = {'Lavarossa', 'Wood Golem', 'Chakra Knight', 'Haku', 'Hyuga'};
+local RESPAWN_SETTLE_TIME = 1;
+local BOSS_SCAN_TIME = 8;
+local BOSS_HOP_TIME = 15;
+local bossLookup = {};
+
+-- Boss names turn up spaced, unspaced, and with numbers tacked on, so only compare letters
+local function normalizeName(name)
+    return string.lower((string.gsub(name, '%A', '')));
+end;
+
+for _, bossName in next, BOSS_NAMES do
+    bossLookup[normalizeName(bossName)] = true;
+end;
 
 if (game.PlaceId ~= MAIN_PLACE_ID) then
     return ToastNotif.new({text = 'Script will not run in lobby.'});
@@ -50,7 +67,6 @@ local column1, column2 = unpack(library.columns);
 
 local localCheats = column1:AddSection('Local Cheats');
 local visualCheats = column1:AddSection('Visual Cheats');
-local riskyCheats = column2:AddSection('Risky Cheats');
 local teleportCheats = column2:AddSection('Teleport Cheats');
 local miscCheats = column2:AddSection('Misc Cheats');
 
@@ -419,7 +435,13 @@ do
             local rootPart = FindFirstChild(object, 'HumanoidRootPart') or FindFirstChild(object, 'Main');
             if (not rootPart) then return end;
 
-            if (npcValue.Value == 'Dialog') then
+            --[[
+                Some bosses (Haku) ship with the Dialog tag even though they fight
+                back, so bosses are always treated as combat mobs
+            ]]
+            local kind = bossLookup[normalizeName(object.Name)] and 'Combat' or npcValue.Value;
+
+            if (kind == 'Dialog') then
                 table.insert(npcs, object.Name);
                 npcsList[object.Name] = object;
                 attachTargets[rootPart] = 'npc';
@@ -432,7 +454,7 @@ do
                     attachTargets[rootPart] = nil;
                     npcESP:Destroy();
                 end);
-            elseif (npcValue.Value == 'Combat') then
+            elseif (kind == 'Combat') then
                 -- onEntityAdded may have already tagged this as a player, we know better
                 attachTargets[rootPart] = 'mob';
 
@@ -509,6 +531,23 @@ do
 
         maid.workspaceListener = Utility.listenToChildAdded(workspace, onWorkspaceChildAdded);
 
+        -- Plenty of mobs share a name, so pick whichever one of them is closest
+        local function getNearestMob(myPosition, mobName)
+            local closest, closestDistance = nil, math.huge;
+
+            for mobRootPart in next, mobsList[mobName] or {} do
+                if (not mobRootPart.Parent) then continue end;
+
+                local distance = (mobRootPart.Position - myPosition).Magnitude;
+
+                if (distance < closestDistance) then
+                    closest, closestDistance = mobRootPart, distance;
+                end;
+            end;
+
+            return closest;
+        end;
+
         function funcs.teleportToNPC()
             local npcName = library.flags.npcTeleport;
             local npc = npcsList[npcName];
@@ -524,25 +563,10 @@ do
         end;
 
         function funcs.teleportToMob()
-            local mobName = library.flags.mobTeleport;
-            local spawned = mobsList[mobName];
-
             local rootPart = localPlayerData.rootPart;
             if (not rootPart) then return end;
 
-            -- Plenty of mobs share a name, so go to whichever one is closest
-            local myPosition = rootPart.Position;
-            local closest, closestDistance = nil, math.huge;
-
-            for mobRootPart in next, spawned or {} do
-                if (not mobRootPart.Parent) then continue end;
-
-                local distance = (mobRootPart.Position - myPosition).Magnitude;
-
-                if (distance < closestDistance) then
-                    closest, closestDistance = mobRootPart, distance;
-                end;
-            end;
+            local closest = getNearestMob(rootPart.Position, library.flags.mobTeleport);
 
             if (not closest) then
                 return ToastNotif.new({text = 'No mob by that name is alive right now.'});
@@ -603,6 +627,52 @@ do
             return closest;
         end;
 
+        --[[
+            Resolves what attach to back should lock onto. Locked modes ignore the
+            range limit on purpose so you can pull yourself across the map
+        ]]
+        local function getAttachTarget(myRootPart)
+            local mode = library.flags.attachMode;
+
+            if (mode == 'Locked Player') then
+                local targetData = Utility:getPlayerData(library.flags.attachPlayer);
+                local rootPart = targetData and targetData.rootPart;
+
+                return rootPart ~= myRootPart and rootPart or nil;
+            end;
+
+            if (mode == 'Locked Mob') then
+                return getNearestMob(myRootPart.Position, library.flags.attachMob);
+            end;
+
+            return getClosestEntity(myRootPart);
+        end;
+
+        --[[
+            Where to sit relative to a target. The offset is applied in the target's
+            own space, then we pitch/yaw straight at them so hitboxes still line up
+            when the height offset puts us above or below them
+        ]]
+        local function getAttachCFrame(targetCF)
+            local offsetCF = targetCF * CFrame.new(0, library.flags.attachToBackHeight, library.flags.attachToBackSpace);
+            local goalPos = offsetCF.Position;
+            local toTarget = targetCF.Position - goalPos;
+
+            -- lookAt with two identical points gives a NaN rotation
+            if (toTarget.Magnitude <= ATTACH_MIN_STEP) then
+                return offsetCF;
+            end;
+
+            --[[
+                Sitting dead above/below them makes the default up vector parallel to
+                the look direction, which is also NaN, so borrow the target's facing
+            ]]
+            local flat = Vector3.new(toTarget.X, 0, toTarget.Z);
+            local up = flat.Magnitude <= ATTACH_MIN_STEP and targetCF.LookVector or Vector3.yAxis;
+
+            return CFrame.lookAt(goalPos, targetCF.Position, up);
+        end;
+
         library.OnKeyPress:Connect(function(input, gpe)
             if (gpe or not library.options.attachToBack) then return end;
 
@@ -616,7 +686,7 @@ do
 
             -- Keep looking while the key is held, in case nothing is in range yet
             repeat
-                closest = getClosestEntity(myRootPart);
+                closest = getAttachTarget(myRootPart);
                 if (closest) then break end;
 
                 task.wait();
@@ -624,7 +694,18 @@ do
 
             if (not closest or input.UserInputState == Enum.UserInputState.End) then return end;
 
-            local lastGoalPos;
+            -- Auto rotate would keep snapping our yaw back whenever we hold a movement key
+            local humanoid = localPlayerData.humanoid;
+
+            if (humanoid) then
+                humanoid.AutoRotate = false;
+
+                maid.attachToBackRotate = function()
+                    if (humanoid.Parent) then
+                        humanoid.AutoRotate = true;
+                    end;
+                end;
+            end;
 
             maid.attachToBack = RunService.Heartbeat:Connect(function()
                 -- The character can respawn while we're attached, so re-grab the root part every frame
@@ -633,20 +714,11 @@ do
                 if (not rootPart or not closest.Parent) then
                     maid.attachToBack = nil;
                     maid.attachToBackTween = nil;
+                    maid.attachToBackRotate = nil;
                     return;
                 end;
 
-                local targetCF = closest.CFrame;
-                local goalPos = (targetCF * CFrame.new(0, library.flags.attachToBackHeight, library.flags.attachToBackSpace)).Position;
-
-                -- Always face them, otherwise a negative space slider puts us in front with our back turned
-                local offset = goalPos - targetCF.Position;
-                local goalCF = offset.Magnitude > ATTACH_MIN_STEP and CFrame.lookAt(goalPos, targetCF.Position) or targetCF;
-
-                -- Don't respam tweens when the target is basically standing still
-                if (lastGoalPos and (goalCF.Position - lastGoalPos).Magnitude < ATTACH_MIN_STEP) then return end;
-                lastGoalPos = goalCF.Position;
-
+                local goalCF = getAttachCFrame(closest.CFrame);
                 local distance = (goalCF.Position - rootPart.Position).Magnitude;
                 local tween = TweenService:Create(rootPart, TweenInfo.new(distance / ATTACH_TWEEN_SPEED, Enum.EasingStyle.Linear), {
                     CFrame = goalCF
@@ -668,6 +740,92 @@ do
 
             maid.attachToBack = nil;
             maid.attachToBackTween = nil;
+            maid.attachToBackRotate = nil;
+        end);
+
+        -- Picks the nearest living mob that passes the auto farm filters
+        local function getFarmTarget(myPosition)
+            local bossesOnly = library.flags.autoFarmBossesOnly;
+            local maxDistance = library.flags.autoFarmRange;
+            local closest, closestDistance = nil, math.huge;
+
+            for rootPart, kind in next, attachTargets do
+                local model = rootPart.Parent;
+                if (kind ~= 'mob' or not model) then continue end;
+                if (bossesOnly and not bossLookup[normalizeName(model.Name)]) then continue end;
+
+                local humanoid = FindFirstChildWhichIsA(model, 'Humanoid');
+                if (not humanoid or humanoid.Health <= 0) then continue end;
+
+                local distance = (rootPart.Position - myPosition).Magnitude;
+
+                if (distance < maxDistance and distance < closestDistance) then
+                    closest, closestDistance = rootPart, distance;
+                end;
+            end;
+
+            return closest;
+        end;
+
+        -- Remembered so we can walk back to the grind spot after respawning
+        local lastFarmPosition;
+
+        --[[
+            Parks us on the target using the attach offsets, then swings with a real
+            left click. Going through VirtualInputManager means the game fires its own
+            CheckMeleeHit, so we never touch the remote ourselves
+        ]]
+        function funcs.autoFarm(state)
+            if (not state) then
+                maid.autoFarm = nil;
+                return;
+            end;
+
+            maid.autoFarm = task.spawn(function()
+                while (library.flags.autoFarm) do
+                    local myRootPart = localPlayerData.rootPart;
+                    local _, _, healthPercent = Utility:getCharacter();
+
+                    -- Bail before swinging, otherwise we trade the last hit and die anyway
+                    if (library.flags.autoFarmHealthBail and healthPercent and healthPercent <= library.flags.autoFarmBailHealth) then
+                        ToastNotif.new({text = string.format('Auto Farm stopped, health dropped to %d%%.', healthPercent), duration = 5});
+                        library.options.autoFarm:SetState(false);
+                        break;
+                    end;
+
+                    local target = myRootPart and getFarmTarget(myRootPart.Position);
+
+                    if (target) then
+                        lastFarmPosition = target.Position;
+                        myRootPart.CFrame = getAttachCFrame(target.CFrame);
+
+                        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0);
+                        task.wait();
+                        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0);
+                    end;
+
+                    task.wait(library.flags.autoFarmDelay);
+                end;
+            end);
+        end;
+
+        --[[
+            You respawn miles from the grind spot, so the farm loop would just idle
+            out of range forever. Drag ourselves back to where we last hit something
+        ]]
+        Utility.onLocalCharacterAdded:Connect(function(playerData)
+            if (not library.flags.autoFarmReturnOnDeath or not lastFarmPosition) then return end;
+            if (not library.flags.autoFarm) then return end;
+
+            local rootPart = playerData.rootPart or playerData.character:WaitForChild('HumanoidRootPart', 10);
+            if (not rootPart) then return end;
+
+            -- The character isn't done loading the frame it spawns, moving it too early gets undone
+            task.wait(RESPAWN_SETTLE_TIME);
+            if (not rootPart.Parent or not library.flags.autoFarm) then return end;
+
+            rootPart.CFrame = CFrame.new(lastFarmPosition + Vector3.new(0, 0, -5), lastFarmPosition);
+            ToastNotif.new({text = 'Returned to the farm spot.'});
         end);
     end;
 
@@ -794,21 +952,7 @@ do
             audios[soundName]:Play();
         end;
     end;
-
-    -- Add Purchasable Items
-    do
-        for itemName, item in next, gameManager.Items or {} do
-            table.insert(itemNames, itemName);
-
-            if (typeof(item) == 'table' and item.Buyabble) then
-                table.insert(purchasableItems, itemName);
-            end;
-        end;
-
-        table.sort(purchasableItems);
-        table.sort(itemNames);
-    end;
-
+    
     -- Mod Detector
     do
         local GROUP_ID = 7450839;
@@ -1017,6 +1161,64 @@ do
                 end;
             end);
         end;
+
+        --[[
+            Bosses aren't a named singleton like Thunderstorm is, so we poll workspace
+            for a bit instead. They can also spawn in after we land
+        ]]
+        local function waitForBoss()
+            local deadline = os.clock() + BOSS_SCAN_TIME;
+
+            repeat
+                for _, object in next, workspace:GetChildren() do
+                    if (bossLookup[normalizeName(object.Name)]) then
+                        return object.Name;
+                    end;
+                end;
+
+                task.wait(0.5);
+            until (os.clock() > deadline);
+
+            return nil;
+        end;
+
+        function funcs.findBossServer(state)
+            if (not state) then
+                maid.bossFinder = nil;
+                return;
+            end;
+
+            maid.bossFinder = task.spawn(function()
+                ToastNotif.new({text = 'Boss Server Finder is running!'});
+
+                local boss = waitForBoss();
+
+                if (boss) then
+                    return ToastNotif.new({text = string.format('Found %s in this server!', boss), duration = 5});
+                end;
+
+                ToastNotif.new({text = 'No boss was found on this server, finding new server...'});
+
+                local serverList = getServerList();
+
+                while (library.flags.bossServerFinder) do
+                    if (#serverList == 0) then
+                        serverList = fetchServerList();
+
+                        if (#serverList == 0) then
+                            ToastNotif.new({text = 'Ran out of servers to hop to, stopping.'});
+                            break;
+                        end;
+                    end;
+
+                    local serverId = table.remove(serverList, math.random(1, #serverList));
+                    saveServerList(serverList);
+
+                    dataEvent:FireServer('ServerTeleport', serverId);
+                    task.wait(BOSS_HOP_TIME);
+                end;
+            end);
+        end;
     end;
 
     -- Chakra Sense Alert
@@ -1044,51 +1246,27 @@ do
         end);
     end;
 
-    function funcs.fly(state)
-        if (not state) then
-            maid.flyBv = nil;
+    function funcs.fly(toggle: boolean): ()
+        if (not toggle) then
             maid.flyHack = nil;
-
-            local humanoid = localPlayerData.humanoid;
-            if (humanoid) then
-                humanoid.PlatformStand = false;
-            end;
+            maid.flyBv = nil;
 
             return;
         end;
 
         maid.flyBv = Instance.new('BodyVelocity');
         maid.flyBv.MaxForce = Vector3.new(math.huge, math.huge, math.huge);
-        maid.flyBv.Velocity = Vector3.zero;
 
         maid.flyHack = RunService.Heartbeat:Connect(function()
-            local rootPart, humanoid = localPlayerData.rootPart, localPlayerData.humanoid;
-            local camera = workspace.CurrentCamera;
+            local playerData = Utility:getPlayerData();
+            local rootPart, camera = playerData.rootPart, workspace.CurrentCamera;
             if (not rootPart or not camera) then return end;
-
-            -- Respawning drops the body mover, so just re-parent it every frame
+            
             maid.flyBv.Parent = rootPart;
-
-            local moveVector = camera.CFrame:VectorToWorldSpace(ControlModule:GetMoveVector());
-
-            if (library.flags.flyVertical) then
-                local upValue = (UserInputService:IsKeyDown(Enum.KeyCode.Space) and 1 or 0) + (UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and -1 or 0);
-                moveVector = Vector3.new(moveVector.X, upValue, moveVector.Z);
-            end;
-
-            -- Diagonals would otherwise be ~1.4x faster than a straight line
-            if (moveVector.Magnitude > 1) then
-                moveVector = moveVector.Unit;
-            end;
-
-            -- Stops the humanoid from fighting us with its own running/falling forces
-            if (humanoid and not humanoid.PlatformStand) then
-                humanoid.PlatformStand = true;
-            end;
-
-            maid.flyBv.Velocity = moveVector * library.flags.flyHackValue;
+            maid.flyBv.Velocity = camera.CFrame:VectorToWorldSpace(ControlModule:GetMoveVector() * library.flags.flyHackValue);
         end);
     end;
+
 
     function funcs.infiniteJump(state)
         if (not state) then
@@ -1150,17 +1328,6 @@ do
 
         forceField:Destroy();
     end;
-
-    function funcs.giveItem()
-        local itemName = library.flags.itemName;
-        if (not itemName or itemName == '') then return ToastNotif.new({text = 'Select an item first.'}) end;
-
-        if (not library:ShowConfirm(string.format('Purchase <font color="rgb(255, 0, 0)">%s</font>? This fires a server remote and is detectable.', itemName))) then
-            return;
-        end;
-
-        originalFunctions.invokeServer(dataFunction, 'Pay', 1, itemName, 1);
-    end;
 end;
 
 -- Add Features To UI
@@ -1175,12 +1342,6 @@ localCheats:AddSlider({
     max = 250,
     flag = 'Fly Hack Value',
     textpos = 2
-});
-
-localCheats:AddToggle({
-    text = 'Fly Vertical',
-    state = true,
-    tip = 'Space to go up, Left Shift to go down.'
 });
 
 localCheats:AddToggle({
@@ -1209,12 +1370,21 @@ localCheats:AddDivider('Attach To Back');
 localCheats:AddBind({
     text = 'Attach To Back',
     mode = 'hold',
-    tip = 'Hold to tween onto the nearest enabled target.'
+    tip = 'Hold to tween onto your target.'
 });
 
-localCheats:AddToggle({text = 'Attach To Players', state = true});
-localCheats:AddToggle({text = 'Attach To Mobs', state = true});
-localCheats:AddToggle({text = 'Attach To Npcs', tip = 'Dialog NPCs. They never move, so this is off by default.'});
+localCheats:AddList({
+    text = 'Attach Mode',
+    values = {'Nearest', 'Locked Player', 'Locked Mob'},
+    tip = 'Locked modes ignore the range limit, so you can pull yourself in from anywhere.'
+});
+
+localCheats:AddList({text = 'Attach Player', playerOnly = true});
+localCheats:AddList({text = 'Attach Mob', values = mobs});
+
+localCheats:AddToggle({text = 'Attach To Players', state = true, tip = 'Nearest mode only.'});
+localCheats:AddToggle({text = 'Attach To Mobs', state = true, tip = 'Nearest mode only.'});
+localCheats:AddToggle({text = 'Attach To Npcs', tip = 'Nearest mode only. Dialog NPCs never move, so this is off by default.'});
 
 localCheats:AddSlider({
     text = 'Attach To Back Height',
@@ -1229,6 +1399,56 @@ localCheats:AddSlider({
     min = -100,
     value = 2,
     max = 100,
+    textpos = 2
+});
+
+localCheats:AddDivider('Auto Farm');
+
+localCheats:AddToggle({
+    text = 'Auto Farm',
+    callback = funcs.autoFarm,
+    tip = 'Parks on the nearest mob and left clicks. Uses the Attach To Back height/space offsets.'
+});
+
+localCheats:AddToggle({
+    text = 'Auto Farm Bosses Only',
+    tip = 'Only targets Lavarossa, Wood Golem and Chakra Knight.'
+});
+
+localCheats:AddSlider({
+    text = 'Auto Farm Range',
+    min = 10,
+    value = 150,
+    max = 500,
+    textpos = 2
+});
+
+localCheats:AddSlider({
+    text = 'Auto Farm Delay',
+    min = 0.05,
+    value = 0.4,
+    max = 3,
+    float = 0.05,
+    textpos = 2
+});
+
+localCheats:AddToggle({
+    text = 'Auto Farm Return On Death',
+    state = true,
+    tip = 'Teleports back to the last mob you hit after respawning.'
+});
+
+localCheats:AddToggle({
+    text = 'Auto Farm Health Bail',
+    state = true,
+    tip = 'Turns Auto Farm off when your health drops below the threshold.'
+});
+
+localCheats:AddSlider({
+    text = 'Auto Farm Bail Health',
+    min = 5,
+    value = 35,
+    max = 95,
     textpos = 2
 });
 
@@ -1293,10 +1513,6 @@ visualCheats:AddList({
     values = {'Morning', 'Afternoon', 'Evening', 'Night'}
 });
 
-riskyCheats:AddLabel('These fire server remotes and can get you banned.');
-riskyCheats:AddList({text = 'Item Name', values = purchasableItems});
-riskyCheats:AddButton({text = 'Purchase Item', callback = funcs.giveItem});
-
 teleportCheats:AddDivider('Chakra Points');
 teleportCheats:AddList({text = 'Chakra Point', values = chakraPoints});
 teleportCheats:AddButton({text = 'Teleport To', callback = funcs.teleportToChakraPoint});
@@ -1314,4 +1530,11 @@ teleportCheats:AddList({text = 'Players', flag = 'Player Teleport', playerOnly =
 teleportCheats:AddButton({text = 'Teleport To', callback = funcs.teleportToPlayer});
 
 miscCheats:AddToggle({text = 'Thunderstorm Server Finder', callback = funcs.findThunderstormServer});
+
+miscCheats:AddToggle({
+    text = 'Boss Server Finder',
+    callback = funcs.findBossServer,
+    tip = 'Hops until a server has Lavarossa, Wood Golem or Chakra Knight spawned.'
+});
+
 miscCheats:AddButton({text = 'Server Hop', callback = funcs.serverHop});
