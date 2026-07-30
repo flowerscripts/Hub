@@ -57,28 +57,113 @@ local AUTO_FARM_SWING_DELAY = 0.1;
 local AUTO_FARM_DEFAULT_HEIGHT = 8;
 local AUTO_FARM_DEFAULT_SPACE = 6;
 
+-- Sentinel row in the boss list that means 'whichever boss is closest'
+local AUTO_FARM_NEAREST = 'Nearest';
+
 local RESPAWN_SETTLE_TIME = 1;
 local BOSS_SCAN_TIME = 8;
 local BOSS_HOP_TIME = 15;
 
-local bossLookup = {};
-local bossNames = {};
+--[[
+    Trinkets drop a few seconds after the boss actually dies, so the farm loop hangs
+    around the corpse for this long instead of leaving for the next boss
+]]
+local REWARD_SPAWN_WAIT = 10;
 
--- Every boss is a different size, so each one remembers its own parking spot
-local bossOffsets = {};
+--[[
+    Safe Teleport. Animation ids we bail out on, filled from the Teleport Animation Ids
+    box or straight off a row in the animation logger
+]]
+local coverAnimations = {};
+
+--[[
+    Auto Block. Sound names that mean a heavy attack is coming. SnakeBite is Manda's,
+    HeavyPunchCharge is everyone's, and both play well before the hit lands
+]]
+local DEFAULT_BLOCK_SOUNDS = 'SnakeBite, HeavyPunchCharge';
+local blockSounds = {};
+
+local function setBlockSounds(text)
+    table.clear(blockSounds);
+
+    for soundName in string.gmatch(text or '', '[%w_]+') do
+        blockSounds[soundName] = true;
+    end;
+end;
+
+local function setCoverAnimations(text)
+    table.clear(coverAnimations);
+
+    for animId in string.gmatch(text or '', '%d+') do
+        coverAnimations[animId] = true;
+    end;
+end;
+
+local function addCoverAnimation(animId)
+    if (not animId or coverAnimations[animId]) then return end;
+
+    coverAnimations[animId] = true;
+
+    -- Mirror it back into the box so the config remembers it next session
+    local box = library.options.teleportAnimationIds;
+    if (not box or not box.SetValue) then return end;
+
+    local ids = {};
+
+    for id in next, coverAnimations do
+        table.insert(ids, id);
+    end;
+
+    table.sort(ids);
+    box:SetValue(table.concat(ids, ', '));
+end;
+
+local bossLookup = {};
+local bossNames = {AUTO_FARM_NEAREST};
+
+--[[
+    Every boss is a different size, so each one remembers its own parking spot.
+    Keyed by boss key, with the '' entry holding the fallback for bosses you
+    haven't tuned yet
+]]
+local bossOffsets = {
+    [''] = {
+        height = AUTO_FARM_DEFAULT_HEIGHT,
+        space = AUTO_FARM_DEFAULT_SPACE
+    }
+};
 
 -- Boss names turn up spaced, unspaced, and with numbers tacked on, so only compare letters
 local function normalizeName(name)
     return string.lower((string.gsub(name, '%A', '')));
 end;
 
+--[[
+    The same boss shows up as 'Haku', 'Haku Boss' and 'HakuBoss2' depending on
+    whether you're looking at the model, the rewards drop or a duplicate spawn, so
+    everything that has to match a boss by name goes through this
+]]
+local function bossKey(name)
+    if (not name or name == AUTO_FARM_NEAREST) then return '' end;
+
+    return (string.gsub(normalizeName(name), 'boss$', ''));
+end;
+
+-- What the farm loop parks by: the target's own config, or the shared fallback
 local function getBossOffsets(bossName)
-    local key = normalizeName(bossName or '');
+    return bossOffsets[bossKey(bossName)] or bossOffsets[''];
+end;
+
+-- What the sliders write to. 'Nearest' edits the fallback every boss starts on
+local function getEditableOffsets(bossName)
+    local key = bossKey(bossName);
 
     if (not bossOffsets[key]) then
+        local fallback = bossOffsets[''];
+
         bossOffsets[key] = {
-            height = AUTO_FARM_DEFAULT_HEIGHT,
-            space = AUTO_FARM_DEFAULT_SPACE
+            height = fallback.height,
+            space = fallback.space
         };
     end;
 
@@ -86,7 +171,9 @@ local function getBossOffsets(bossName)
 end;
 
 local function addBossName(name)
-    local key = normalizeName(name);
+    name = string.match(name, '^%s*(.-)%s*$');
+
+    local key = bossKey(name);
     if (key == '' or bossLookup[key]) then return end;
 
     bossLookup[key] = true;
@@ -101,7 +188,14 @@ local function addBossName(name)
         table.insert(bossNames, name);
     end;
 
-    table.sort(bossNames);
+    -- Nearest stays pinned to the top, the actual bosses sort under it
+    table.sort(bossNames, function(a, b)
+        if (a == AUTO_FARM_NEAREST or b == AUTO_FARM_NEAREST) then
+            return a == AUTO_FARM_NEAREST;
+        end;
+
+        return a < b;
+    end);
 end;
 
 for _, bossName in next, BOSS_NAMES do
@@ -130,6 +224,13 @@ local chatLogger = TextLogger.new({
 	title = 'Chat Logger',
 	-- buttons = {'Spectate', 'Copy Username', 'Copy User Id', 'Copy Text'}
 });
+
+local animLogger = TextLogger.new({
+    title = 'Animation Logger',
+    buttons = {'Copy Animation Id', 'Add To Teleport List', 'Add To Ignore List', 'Delete Log', 'Clear All'}
+});
+
+animLogger.ignoreList = {};
 
 local localPlayer = Players.LocalPlayer;
 
@@ -489,7 +590,7 @@ do
                 Some bosses (Haku) ship with the Dialog tag even though they fight
                 back, so bosses are always treated as combat mobs
             ]]
-            local kind = bossLookup[normalizeName(object.Name)] and 'Combat' or npcValue.Value;
+            local kind = bossLookup[bossKey(object.Name)] and 'Combat' or npcValue.Value;
 
             if (kind == 'Dialog') then
                 table.insert(npcs, object.Name);
@@ -550,6 +651,123 @@ do
             end);
         end;
 
+        --[[
+            Safe Teleport. Bosses telegraph everything with an animation, so when one we
+            flagged starts playing we teleport flat out behind the boss and sit there
+            until the move is over. Both farm loops watch coverUntil so they don't drag
+            us straight back into it
+        ]]
+        local coverUntil = 0;
+
+        local function takeCover(rootPart)
+            local myRootPart = localPlayerData.rootPart;
+            if (not myRootPart or not rootPart.Parent) then return end;
+
+            coverUntil = os.clock() + library.flags.safeTeleportTime;
+
+            -- Behind them in their own space, so we end up out of the swing arc
+            local goalPos = (rootPart.CFrame * CFrame.new(0, library.flags.safeTeleportHeight, library.flags.safeTeleportDistance)).Position;
+
+            -- Keep facing them so we can read the next move and swing the moment we're back
+            myRootPart.CFrame = CFrame.lookAt(goalPos, rootPart.Position);
+        end;
+
+        local function isTakingCover()
+            return os.clock() < coverUntil;
+        end;
+
+        --[[
+            Auto Grip. A downed enemy carries Settings.Knocked, and the finisher is a B
+            press at point blank range, so park on their root part and hit it. gripUntil
+            keeps auto farm from yanking us back to its parking offset mid grip
+        ]]
+        local GRIP_HOLD_TIME = 0.5;
+        local GRIP_COOLDOWN = 1.5;
+        local GRIP_SCAN_DELAY = 0.2;
+
+        local gripUntil = 0;
+        local lastGripAt = {};
+
+        local function isGripping()
+            return os.clock() < gripUntil;
+        end;
+
+        local function isKnocked(model)
+            local settings = FindFirstChild(model, 'Settings');
+            local knocked = settings and FindFirstChild(settings, 'Knocked');
+
+            return knocked and knocked.Value == true;
+        end;
+
+        local function gripTarget(rootPart)
+            local model = rootPart.Parent;
+            local myRootPart = localPlayerData.rootPart;
+            if (not myRootPart or not model) then return end;
+
+            -- The grip animation needs a moment, so don't spam B at the same body
+            if (os.clock() - (lastGripAt[model] or 0) < GRIP_COOLDOWN) then return end;
+
+            lastGripAt[model] = os.clock();
+            gripUntil = os.clock() + GRIP_HOLD_TIME;
+
+            myRootPart.CFrame = CFrame.new(rootPart.Position);
+            task.wait();
+
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.B, false, game);
+            task.wait();
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.B, false, game);
+        end;
+
+        function funcs.autoGrip(state)
+            if (not state) then
+                maid.autoGrip = nil;
+                return;
+            end;
+
+            maid.autoGrip = task.spawn(function()
+                while (library.flags.autoGrip) do
+                    local myRootPart = localPlayerData.rootPart;
+
+                    if (myRootPart) then
+                        for rootPart in next, attachTargets do
+                            local model = rootPart.Parent;
+                            if (not model or not isKnocked(model)) then continue end;
+                            if ((rootPart.Position - myRootPart.Position).Magnitude > library.flags.autoGripRange) then continue end;
+
+                            gripTarget(rootPart);
+                            break;
+                        end;
+                    end;
+
+                    task.wait(GRIP_SCAN_DELAY);
+                end;
+            end);
+        end;
+
+        -- One hook per entity, shared by the animation logger, safe teleport and auto block
+        local function onAnimationPlayed(object, rootPart, animationTrack)
+            local animation = animationTrack.Animation;
+            local animId = animation and string.match(tostring(animation.AnimationId), '%d+') or 'unknown';
+
+            local myRootPart = localPlayerData.rootPart;
+            if (not myRootPart) then return end;
+
+            local distance = (myRootPart.Position - rootPart.Position).Magnitude;
+            local kind = attachTargets[rootPart] or 'player';
+
+            if (library.flags.safeTeleport and kind == 'mob' and coverAnimations[animId] and distance <= library.flags.safeTeleportRange) then
+                takeCover(rootPart);
+            end;
+
+            if (not library.flags.animationLogger) then return end;
+            if (animLogger.ignoreList[animId] or distance > library.flags.animLoggerMaxRange) then return end;
+
+            animLogger:AddText({
+                text = string.format('Animation <font color=\'#2ecc71\'>%s</font> played from <font color=\'#3498db\'>%s</font> [%s]', animId, object.Name, kind),
+                animationId = animId
+            });
+        end;
+
         local function onEntityAdded(object)
             if (object == localPlayer.Character) then return end;
 
@@ -564,10 +782,163 @@ do
                 attachTargets[rootPart] = 'player';
             end;
 
+            maid[humanoid] = humanoid.AnimationPlayed:Connect(function(animationTrack)
+                onAnimationPlayed(object, rootPart, animationTrack);
+            end);
+
             object.Destroying:Connect(function()
                 attachTargets[rootPart] = nil;
+                maid[humanoid] = nil;
             end);
         end;
+
+        --[[
+            Auto Block. The dangerous moves announce themselves with a sound before they
+            land (Manda's SnakeBite, anyone's HeavyPunchCharge), so hold block for as
+            long as that sound is playing near us
+        ]]
+        local blockHolds = 0;
+
+        -- Binds can be a key or a mouse button, so send whichever the user picked
+        local function setBlockHeld(held)
+            local bind = library.options.blockKey;
+            local key = bind and bind.key;
+            if (not key) then return end;
+
+            if (key == 'MouseButton1' or key == 'MouseButton2') then
+                VirtualInputManager:SendMouseButtonEvent(0, 0, key == 'MouseButton1' and 0 or 1, held, game, 0);
+                return;
+            end;
+
+            local gotKeyCode, keyCode = pcall(function()
+                return Enum.KeyCode[key];
+            end);
+
+            if (not gotKeyCode or not keyCode) then return end;
+
+            VirtualInputManager:SendKeyEvent(held, keyCode, false, game);
+        end;
+
+        -- Sounds hang off parts, attachments or the model itself depending on the move
+        local function getSoundPosition(sound)
+            local parent = sound.Parent;
+            if (not parent) then return nil end;
+
+            if (IsA(parent, 'BasePart')) then
+                return parent.Position;
+            end;
+
+            if (IsA(parent, 'Attachment')) then
+                return parent.WorldPosition;
+            end;
+
+            if (IsA(parent, 'Model')) then
+                local part = parent.PrimaryPart or FindFirstChildWhichIsA(parent, 'BasePart', true);
+                return part and part.Position or nil;
+            end;
+
+            return nil;
+        end;
+
+        local function holdBlockFor(sound)
+            blockHolds += 1;
+
+            if (blockHolds == 1) then
+                setBlockHeld(true);
+            end;
+
+            --[[
+                Released when the sound stops. The time cap is there so a sound that gets
+                destroyed mid-playback can never leave block stuck down
+            ]]
+            local deadline = os.clock() + library.flags.autoBlockMaxTime;
+
+            repeat
+                task.wait(0.05);
+            until (not sound.Parent or not sound.IsPlaying or not library.flags.autoBlock or os.clock() > deadline);
+
+            blockHolds -= 1;
+
+            if (blockHolds <= 0) then
+                blockHolds = 0;
+                setBlockHeld(false);
+            end;
+        end;
+
+        local function onSoundPlayed(sound)
+            if (not library.flags.autoBlock or not blockSounds[sound.Name]) then return end;
+
+            local myRootPart = localPlayerData.rootPart;
+            if (not myRootPart) then return end;
+
+            -- A sound with no position is global, so it's aimed at us either way
+            local soundPosition = getSoundPosition(sound);
+
+            if (soundPosition and (soundPosition - myRootPart.Position).Magnitude > library.flags.autoBlockRange) then
+                return;
+            end;
+
+            ToastNotif.new({text = string.format('Blocking %s.', sound.Name)});
+            task.spawn(holdBlockFor, sound);
+        end;
+
+        local function onSoundAdded(object)
+            if (not IsA(object, 'Sound')) then return end;
+
+            --[[
+                Bosses reuse their sound instances, so Played is what we really watch.
+                A sound cloned in already playing never fires it, hence the second check
+            ]]
+            maid[object] = object.Played:Connect(function()
+                onSoundPlayed(object);
+            end);
+
+            object.Destroying:Connect(function()
+                maid[object] = nil;
+            end);
+
+            if (object.IsPlaying) then
+                task.spawn(onSoundPlayed, object);
+            end;
+        end;
+
+        --[[
+            Attack sounds live under the target's HumanoidRootPart, and the map holds a
+            few thousand descendants, so only the Sound instances get a listener
+        ]]
+        maid.soundListener = workspace.DescendantAdded:Connect(onSoundAdded);
+
+        library.OnLoad:Connect(function()
+            for _, object in next, workspace:GetDescendants() do
+                if (IsA(object, 'Sound')) then
+                    onSoundAdded(object);
+                end;
+            end;
+        end);
+
+        function funcs.animationLogger(state)
+            animLogger:SetVisible(state);
+        end;
+
+        animLogger.OnClick:Connect(function(action, context)
+            if (action == 'Copy Animation Id') then
+                setclipboard(context.animationId);
+            elseif (action == 'Add To Teleport List') then
+                addCoverAnimation(context.animationId);
+                ToastNotif.new({text = string.format('Teleporting away from animation %s from now on.', context.animationId)});
+            elseif (action == 'Add To Ignore List') then
+                animLogger.ignoreList[context.animationId] = true;
+            elseif (action == 'Delete Log') then
+                context:Destroy();
+            elseif (action == 'Clear All') then
+                for _, log in next, animLogger.logs do
+                    log.label:Destroy();
+                end;
+
+                table.clear(animLogger.logs);
+                table.clear(animLogger.allLogs);
+            end;
+        end);
 
         --[[
             Killing a boss drops a <BossName>Rewards model with the loot nested under
@@ -880,6 +1251,12 @@ do
                     return;
                 end;
 
+                -- Safe teleport put us out of range on purpose, don't tween back in yet
+                if (isTakingCover()) then
+                    maid.attachToBackTween = nil;
+                    return;
+                end;
+
                 local goalCF = getAttachCFrame(closest.CFrame, library.flags.attachToBackHeight, library.flags.attachToBackSpace);
                 movers.apply(rootPart, goalCF);
 
@@ -908,17 +1285,21 @@ do
         end);
 
         --[[
-            Picks the nearest living boss anywhere in the server. Regular mobs are
-            never worth the swings, and there's no range limit because we teleport
-            onto the target anyway
+            Picks a living boss anywhere in the server, nearest first. Regular mobs are
+            never worth the swings, and there's no range limit because we teleport onto
+            the target anyway. Picking a name in the boss list farms only that boss
         ]]
         local function getFarmTarget(myPosition)
+            local wantedKey = bossKey(library.flags.autoFarmBoss);
             local closest, closestDistance = nil, math.huge;
 
             for rootPart, kind in next, attachTargets do
                 local model = rootPart.Parent;
                 if (kind ~= 'mob' or not model) then continue end;
-                if (not bossLookup[normalizeName(model.Name)]) then continue end;
+
+                local modelKey = bossKey(model.Name);
+                if (not bossLookup[modelKey]) then continue end;
+                if (wantedKey ~= '' and modelKey ~= wantedKey) then continue end;
 
                 local humanoid = FindFirstChildWhichIsA(model, 'Humanoid');
                 if (not humanoid or humanoid.Health <= 0) then continue end;
@@ -937,22 +1318,49 @@ do
         local lastFarmPosition;
 
         --[[
-            Parks us on the target using the attach offsets, then swings with a real
-            left click. Going through VirtualInputManager means the game fires its own
-            CheckMeleeHit, so we never touch the remote ourselves
+            Parks us on the target using its offsets, then swings with a real left
+            click. Going through VirtualInputManager means the game fires its own
+            CheckMeleeHit, so we never touch the remote ourselves.
+
+            Holding the spot runs on Heartbeat while the swings run on their own
+            cooldown loop, otherwise we'd only correct our position once per swing and
+            spend the gap between them drifting off the boss
         ]]
         function funcs.autoFarm(state)
             if (not state) then
                 maid.autoFarm = nil;
+                maid.autoFarmHold = nil;
                 maid.autoFarmMovers = nil;
                 return;
             end;
 
             local movers = createMoverPool();
+            local target;
+
+            -- Set when the boss we were on dies, so we stay for the trinkets it owes us
+            local rewardDeadline = 0;
+            local hadTarget = false;
 
             maid.autoFarmMovers = function()
                 movers.clear();
             end;
+
+            maid.autoFarmHold = RunService.Heartbeat:Connect(function()
+                local myRootPart = localPlayerData.rootPart;
+                if (not myRootPart or not target or not target.Parent) then return end;
+
+                --[[
+                    Mid safe teleport the movers keep us parked out of reach, and mid grip
+                    we need to stay on the body, so leave the position alone either way
+                ]]
+                if (isTakingCover() or isGripping()) then return end;
+
+                local offsets = getBossOffsets(target.Parent.Name);
+                local goalCF = getAttachCFrame(target.CFrame, offsets.height, offsets.space);
+
+                movers.apply(myRootPart, goalCF);
+                myRootPart.CFrame = goalCF;
+            end);
 
             maid.autoFarm = task.spawn(function()
                 while (library.flags.autoFarm) do
@@ -966,15 +1374,15 @@ do
                         break;
                     end;
 
-                    local target = myRootPart and getFarmTarget(myRootPart.Position);
+                    -- While the last kill still owes us trinkets we don't go looking for a new boss
+                    local waitingForRewards = os.clock() < rewardDeadline;
+                    target = (not waitingForRewards) and myRootPart and getFarmTarget(myRootPart.Position) or nil;
 
-                    if (target) then
-                        local offsets = getBossOffsets(target.Parent and target.Parent.Name);
-                        local goalCF = getAttachCFrame(target.CFrame, offsets.height, offsets.space);
-
+                    if (isTakingCover()) then
+                        -- Riding out a telegraphed move, no swinging and no wandering off
+                    elseif (target) then
                         lastFarmPosition = target.Position;
-                        movers.apply(myRootPart, goalCF);
-                        myRootPart.CFrame = goalCF;
+                        hadTarget = true;
 
                         VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0);
                         task.wait();
@@ -982,6 +1390,12 @@ do
                     elseif (myRootPart) then
                         -- Nothing left to hit, so let go and go bank what the boss dropped
                         movers.clear();
+
+                        if (hadTarget) then
+                            hadTarget = false;
+                            rewardDeadline = os.clock() + REWARD_SPAWN_WAIT;
+                        end;
+
                         collectRewardDrops(myRootPart);
                     end;
 
@@ -1131,6 +1545,15 @@ do
             end;
 
             audios[soundName]:Play();
+        end;
+    end;
+
+        -- Add Purchasable Items
+    do
+        for itemName, item in next, gameManager.Items do
+            if (item.Buyabble) then
+                table.insert(purchasableItems, itemName);
+            end;
         end;
     end;
     
@@ -1352,7 +1775,7 @@ do
 
             repeat
                 for _, object in next, workspace:GetChildren() do
-                    if (bossLookup[normalizeName(object.Name)]) then
+                    if (bossLookup[bossKey(object.Name)]) then
                         return object.Name;
                     end;
                 end;
@@ -1532,7 +1955,7 @@ localCheats:AddToggle({
 });
 localCheats:AddSlider({
     min = 16,
-    max = 250,
+    max = 1000,
     flag = 'Fly Hack Value',
     textpos = 2
 });
@@ -1543,7 +1966,7 @@ localCheats:AddToggle({
 });
 localCheats:AddSlider({
     min = 16,
-    max = 250,
+    max = 1000,
     flag = 'Speed Hack Value',
     textpos = 2
 });
@@ -1604,20 +2027,21 @@ localCheats:AddToggle({
 });
 
 --[[
-    The height/space sliders edit whichever boss is picked here, so you can tune a
-    parking spot per boss and switch between them without losing the last one
+    Picks which boss to farm, and which boss the height/space sliders below belong to,
+    so you can tune a parking spot per boss and switch between them without losing the
+    last one. Nearest farms every boss and edits the offsets they all start on
 ]]
 localCheats:AddList({
     text = 'Auto Farm Boss',
     values = bossNames,
-    tip = 'Which boss the height and space sliders below belong to.',
+    tip = 'The boss to farm, and the one the sliders below configure.',
     callback = function(bossName)
         local heightSlider, spaceSlider = library.options.autoFarmHeight, library.options.autoFarmSpace;
 
         -- This can fire while the menu is still building, before the sliders are drawn
         if (not heightSlider or not heightSlider.SetValue or not spaceSlider) then return end;
 
-        local offsets = getBossOffsets(bossName);
+        local offsets = getEditableOffsets(bossName);
 
         heightSlider:SetValue(offsets.height, true);
         spaceSlider:SetValue(offsets.space, true);
@@ -1631,7 +2055,7 @@ local autoFarmHeightSlider = localCheats:AddSlider({
     textpos = 2,
     tip = 'How far above the selected boss to sit. We still aim down at it.',
     callback = function(value)
-        getBossOffsets(library.flags.autoFarmBoss).height = value;
+        getEditableOffsets(library.flags.autoFarmBoss).height = value;
     end
 });
 
@@ -1642,7 +2066,7 @@ local autoFarmSpaceSlider = localCheats:AddSlider({
     textpos = 2,
     tip = 'How far behind the selected boss to park. Raise it if you end up inside it.',
     callback = function(value)
-        getBossOffsets(library.flags.autoFarmBoss).space = value;
+        getEditableOffsets(library.flags.autoFarmBoss).space = value;
     end
 });
 
@@ -1677,6 +2101,112 @@ localCheats:AddSlider({
     textpos = 2
 });
 
+localCheats:AddDivider('Auto Grip');
+
+localCheats:AddToggle({
+    text = 'Auto Grip',
+    callback = funcs.autoGrip,
+    tip = 'Teleports onto anything with Settings.Knocked set and presses B to grip it.'
+});
+
+localCheats:AddSlider({
+    text = 'Auto Grip Range',
+    min = 10,
+    value = 150,
+    max = 500,
+    textpos = 2,
+    tip = 'Only grip knocked targets this close.'
+});
+
+localCheats:AddDivider('Safe Teleport');
+
+localCheats:AddToggle({
+    text = 'Safe Teleport',
+    tip = 'Teleports behind the boss the moment it starts one of the animations you flagged.'
+});
+
+localCheats:AddBox({
+    text = 'Teleport Animation Ids',
+    tip = 'Animation ids to run from, comma separated. Grab them from the Animation Logger.',
+    callback = setCoverAnimations
+});
+
+localCheats:AddSlider({
+    text = 'Safe Teleport Range',
+    min = 20,
+    value = 120,
+    max = 500,
+    textpos = 2,
+    tip = 'Only react to animations from mobs this close.'
+});
+
+localCheats:AddSlider({
+    text = 'Safe Teleport Distance',
+    min = 10,
+    value = 60,
+    max = 300,
+    textpos = 2,
+    tip = 'How far behind the boss to land.'
+});
+
+localCheats:AddSlider({
+    text = 'Safe Teleport Height',
+    min = 0,
+    value = 20,
+    max = 200,
+    textpos = 2,
+    tip = 'Extra height on the landing spot, for moves that track along the ground.'
+});
+
+localCheats:AddSlider({
+    text = 'Safe Teleport Time',
+    min = 0.5,
+    value = 2,
+    max = 10,
+    float = 0.1,
+    textpos = 2,
+    tip = 'How long to stay out before auto farm parks you back on the boss.'
+});
+
+localCheats:AddDivider('Auto Block');
+
+localCheats:AddToggle({
+    text = 'Auto Block',
+    tip = 'Holds block while a flagged wind up sound is playing near you.'
+});
+
+localCheats:AddBind({
+    text = 'Block Key',
+    key = 'F',
+    tip = 'The key or mouse button this game blocks with.'
+});
+
+localCheats:AddBox({
+    text = 'Block Sound Names',
+    value = DEFAULT_BLOCK_SOUNDS,
+    tip = 'Sound names to block through, comma separated. They sit under the target\'s root part.',
+    callback = setBlockSounds
+});
+
+localCheats:AddSlider({
+    text = 'Auto Block Range',
+    min = 20,
+    value = 150,
+    max = 500,
+    textpos = 2,
+    tip = 'Only react to sounds this close.'
+});
+
+localCheats:AddSlider({
+    text = 'Auto Block Max Time',
+    min = 0.5,
+    value = 5,
+    max = 15,
+    float = 0.1,
+    textpos = 2,
+    tip = 'Safety cap, so a sound that dies mid playback can never leave block stuck down.'
+});
+
 localCheats:AddDivider('Pickups');
 
 localCheats:AddToggle({text = 'Auto Pickup', callback = funcs.autoPickup});
@@ -1704,6 +2234,23 @@ localCheats:AddDivider('Chat Logger');
 
 localCheats:AddToggle({text = 'Chat Logger', callback = funcs.chatLogger});
 localCheats:AddToggle({text = 'Chat Logger Auto Scroll'});
+
+localCheats:AddDivider('Animation Logger');
+
+localCheats:AddToggle({
+    text = 'Animation Logger',
+    callback = funcs.animationLogger,
+    tip = 'Logs animation ids from everything nearby, with buttons to copy them or flag them for safe teleport.'
+});
+
+localCheats:AddSlider({
+    text = 'Anim Logger Max Range',
+    min = 10,
+    value = 100,
+    max = 500,
+    textpos = 2,
+    tip = 'Only log animations from entities this close.'
+});
 
 localCheats:AddDivider('Character');
 
