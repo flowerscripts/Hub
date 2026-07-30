@@ -728,18 +728,28 @@ do
 
         --[[
             Safe Teleport. Bosses telegraph everything with an animation, so when one we
-            flagged starts playing we teleport flat out behind the boss and sit there
-            until the move is over. Both farm loops watch coverUntil so they don't drag
-            us straight back into it
+            flagged starts playing we teleport out to the far side of the boss and orbit
+            it until the move is over. Tracking jutsu locks onto where we are rather than
+            where we're going, so never holding one spot is what breaks it. Both farm
+            loops watch coverUntil so they don't drag us straight back in
         ]]
         local coverUntil = 0;
 
-        local function moveBehind(rootPart)
+        -- Angle 0 is directly behind them, and it winds around from there
+        local function moveToCover(rootPart, angle)
             local myRootPart = localPlayerData.rootPart;
             if (not myRootPart or not rootPart.Parent) then return false end;
 
-            -- Behind them in their own space, so we end up out of the swing arc
-            local goalPos = (rootPart.CFrame * CFrame.new(0, library.flags.safeTeleportHeight, library.flags.safeTeleportDistance)).Position;
+            local radius = library.flags.safeTeleportDistance;
+
+            -- Orbit in the boss's own space, so their turning doesn't drag us into reach
+            local offset = CFrame.new(
+                math.sin(angle) * radius,
+                library.flags.safeTeleportHeight,
+                math.cos(angle) * radius
+            );
+
+            local goalPos = (rootPart.CFrame * offset).Position;
 
             -- Keep facing them so we can read the next move and swing the moment we're back
             myRootPart.CFrame = CFrame.lookAt(goalPos, rootPart.Position);
@@ -748,7 +758,7 @@ do
         end;
 
         local function takeCover(rootPart, animationTrack)
-            if (not moveBehind(rootPart)) then return end;
+            if (not moveToCover(rootPart, 0)) then return end;
 
             -- Safe Teleport Time is the minimum stay, the animation itself extends it
             coverUntil = os.clock() + library.flags.safeTeleportTime;
@@ -756,17 +766,19 @@ do
             if (not animationTrack) then return end;
 
             --[[
-                Ride the animation out instead of guessing at a duration, following the
-                boss's back the whole way in case it turns or walks through us. The cap
-                is there for tracks that never report stopping
+                Ride the animation out instead of guessing at a duration, circling the
+                whole way. The cap is there for tracks that never report stopping
             ]]
             task.spawn(function()
                 local deadline = os.clock() + SAFE_TELEPORT_MAX_TIME;
+                local angle = 0;
 
                 while (animationTrack.IsPlaying and library.flags.safeTeleport and os.clock() < deadline) do
                     coverUntil = math.max(coverUntil, os.clock() + SAFE_TELEPORT_BUFFER);
 
-                    if (not moveBehind(rootPart)) then break end;
+                    angle += math.rad(library.flags.safeTeleportOrbitSpeed) * SAFE_TELEPORT_STEP;
+
+                    if (not moveToCover(rootPart, angle)) then break end;
 
                     task.wait(SAFE_TELEPORT_STEP);
                 end;
@@ -2522,6 +2534,15 @@ localCheats:AddSlider({
     max = 200,
     textpos = 2,
     tip = 'Extra height on the landing spot, for moves that track along the ground.'
+});
+
+localCheats:AddSlider({
+    text = 'Safe Teleport Orbit Speed',
+    min = 0,
+    value = 240,
+    max = 1080,
+    textpos = 2,
+    tip = 'Degrees per second we circle the boss, to break tracking jutsu. 0 sits still behind it.'
 });
 
 localCheats:AddSlider({
