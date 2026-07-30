@@ -101,6 +101,21 @@ local function setBlockSounds(text)
 end;
 
 --[[
+    Auto Dash. Sounds that mean an ailment stuck to us. Fire keeps burning until it's
+    dashed off, and FireAilment is the only warning we get
+]]
+local DEFAULT_DASH_SOUNDS = 'FireAilment';
+local dashSounds = {};
+
+local function setDashSounds(text)
+    table.clear(dashSounds);
+
+    for soundName in string.gmatch(text or '', '[%w_]+') do
+        dashSounds[soundName] = true;
+    end;
+end;
+
+--[[
     Auto Parry. Animations that get blocked the instant they start rather than on a
     sound cue. The default is Haku's parryable
 ]]
@@ -627,6 +642,18 @@ do
         -- rootPart -> 'player' | 'mob' | 'npc', so attach to back can filter by what you actually want
         local attachTargets = {};
 
+        --[[
+            Every live BodyVelocity/BodyGyro pool, so anything that needs the character to
+            move under its own power for a moment (a grip animation) can let go of them all
+        ]]
+        local moverPools = {};
+
+        local function clearAllMovers()
+            for pool in next, moverPools do
+                pool.clear();
+            end;
+        end;
+
         local function onNpcAdded(object)
             local npcValue = object:WaitForChild('NPC', 10);
             if (not npcValue or not object.Parent) then return end;
@@ -755,18 +782,24 @@ do
 
         --[[
             Auto Grip. A downed enemy carries Settings.Knocked, and the finisher is a B
-            press at point blank range, so park on their root part and hit it. gripUntil
-            keeps auto farm from yanking us back to its parking offset mid grip
+            press at point blank range, so park on their root part and hit it.
+
+            The grip is an animation, not an instant action, so one press has to be left
+            alone until it lands. isGripping() is what stops auto farm from swinging or
+            dragging us back to its parking offset in the middle of it, and Knocked
+            clearing is how we know it finished
         ]]
-        local GRIP_HOLD_TIME = 0.5;
-        local GRIP_COOLDOWN = 1.5;
+        local GRIP_COOLDOWN = 2;
         local GRIP_SCAN_DELAY = 0.2;
+        local GRIP_MAX_TIME = 6;
+        local GRIP_WINDOW_STEP = 0.25;
 
         local gripUntil = 0;
+        local gripping = false;
         local lastGripAt = {};
 
         local function isGripping()
-            return os.clock() < gripUntil;
+            return gripping or os.clock() < gripUntil;
         end;
 
         local function isKnocked(model)
@@ -779,13 +812,17 @@ do
         local function gripTarget(rootPart)
             local model = rootPart.Parent;
             local myRootPart = localPlayerData.rootPart;
-            if (not myRootPart or not model) then return end;
 
-            -- The grip animation needs a moment, so don't spam B at the same body
+            -- One grip at a time, and never a second press at the same body too soon
+            if (gripping or not myRootPart or not model) then return end;
             if (os.clock() - (lastGripAt[model] or 0) < GRIP_COOLDOWN) then return end;
 
+            gripping = true;
             lastGripAt[model] = os.clock();
-            gripUntil = os.clock() + GRIP_HOLD_TIME;
+            gripUntil = os.clock() + GRIP_MAX_TIME;
+
+            -- The animation moves our character, so let go of the farm movers first
+            clearAllMovers();
 
             myRootPart.CFrame = CFrame.new(rootPart.Position);
             task.wait();
@@ -793,6 +830,17 @@ do
             VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.B, false, game);
             task.wait();
             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.B, false, game);
+
+            -- Hold everything off until they're actually gripped, or we've clearly missed
+            local deadline = os.clock() + GRIP_MAX_TIME;
+
+            repeat
+                gripUntil = os.clock() + GRIP_WINDOW_STEP;
+                task.wait(0.1);
+            until (not model.Parent or not isKnocked(model) or os.clock() > deadline);
+
+            gripping = false;
+            gripUntil = 0;
         end;
 
         function funcs.autoGrip(state)
@@ -830,8 +878,8 @@ do
         local blockHolds = 0;
 
         -- Binds can be a key or a mouse button, so send whichever the user picked
-        local function setBlockHeld(held)
-            local bind = library.options.blockKey;
+        local function setBindHeld(bindFlag, held)
+            local bind = library.options[bindFlag];
             local key = bind and bind.key;
             if (not key) then return end;
 
@@ -847,6 +895,31 @@ do
             if (not gotKeyCode or not keyCode) then return end;
 
             VirtualInputManager:SendKeyEvent(held, keyCode, false, game);
+        end;
+
+        local function setBlockHeld(held)
+            setBindHeld('blockKey', held);
+        end;
+
+        -- Auto farm stops swinging while this is up, since m1 would cancel the block
+        local function isBlocking()
+            return blockHolds > 0;
+        end;
+
+        --[[
+            Fire sticks to you until you dash it off, and the ailment sound is the only
+            warning, so tap dash the moment we hear it
+        ]]
+        local DASH_COOLDOWN = 0.5;
+        local lastDashAt = 0;
+
+        local function sendDash()
+            if (os.clock() - lastDashAt < DASH_COOLDOWN) then return end;
+            lastDashAt = os.clock();
+
+            setBindHeld('dashKey', true);
+            task.wait();
+            setBindHeld('dashKey', false);
         end;
 
         --[[
@@ -956,7 +1029,10 @@ do
         end;
 
         local function onSoundPlayed(sound)
-            if (not library.flags.autoBlock or not blockSounds[sound.Name]) then return end;
+            local isBlockCue = library.flags.autoBlock and blockSounds[sound.Name];
+            local isDashCue = library.flags.autoDash and dashSounds[sound.Name];
+
+            if (not isBlockCue and not isDashCue) then return end;
 
             local myRootPart = localPlayerData.rootPart;
             if (not myRootPart) then return end;
@@ -965,6 +1041,12 @@ do
             local soundPosition = getSoundPosition(sound);
 
             if (soundPosition and (soundPosition - myRootPart.Position).Magnitude > library.flags.autoBlockRange) then
+                return;
+            end;
+
+            -- Ailments land on us, so shaking them off comes before anything defensive
+            if (isDashCue) then
+                task.spawn(sendDash);
                 return;
             end;
 
@@ -1390,6 +1472,9 @@ do
                 currentRootPart, bodyVelocity, bodyGyro, humanoid = nil, nil, nil, nil;
             end;
 
+            -- Registered so a grip can free the character from every pool at once
+            moverPools[pool] = true;
+
             return pool;
         end;
 
@@ -1610,6 +1695,10 @@ do
 
                     if (isTakingCover()) then
                         -- Riding out a telegraphed move, no swinging and no wandering off
+                    elseif (isBlocking()) then
+                        -- An m1 would drop the block we're holding, so wait the move out
+                    elseif (isGripping()) then
+                        -- An m1 cancels the grip animation, so let it finish first
                     elseif (target) then
                         lastFarmPosition = target.Position;
                         hadTarget = true;
@@ -2474,6 +2563,26 @@ localCheats:AddSlider({
     float = 0.1,
     textpos = 2,
     tip = 'Safety cap, so a sound that dies mid playback can never leave block stuck down.'
+});
+
+localCheats:AddDivider('Auto Dash');
+
+localCheats:AddToggle({
+    text = 'Auto Dash',
+    tip = 'Taps dash the moment an ailment sound plays, to shake fire off instantly.'
+});
+
+localCheats:AddBind({
+    text = 'Dash Key',
+    key = 'Q',
+    tip = 'The key or mouse button this game dashes with.'
+});
+
+localCheats:AddBox({
+    text = 'Dash Sound Names',
+    value = DEFAULT_DASH_SOUNDS,
+    tip = 'Sound names that should make us dash, comma separated.',
+    callback = setDashSounds
 });
 
 localCheats:AddDivider('Pickups');
