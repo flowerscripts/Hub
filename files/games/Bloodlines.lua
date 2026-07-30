@@ -46,7 +46,7 @@ local ATTACH_MOVER_FORCE = Vector3.new(1e9, 1e9, 1e9);
 -- Auto Farm
 local BOSS_NAMES = {
     'Barbarit', 'Chakra Knight', 'Haku', 'Hyuga', 'Isobu', 'Lava Snake', 'Lavarossa',
-    'Manda', 'Matatabi', 'Samurai', 'Shukaku', 'Tairock', 'Wood Golem', 'Wooden Golem'
+    'Manda', 'Matatabi', 'Samurai', 'Shukaku', 'Tairock', 'Wooden Golem'
 };
 
 --[[
@@ -1045,12 +1045,14 @@ do
         local function watchTrinketSpawn(part)
             if (not IsA(part, 'BasePart') or not string.match(part.Name, '^TrinketSpawn')) then return end;
 
-            local data = {lastVisitAt = 0, occupied = false};
+            local data = {lastVisitAt = 0, occupied = false, visits = 0};
             trinketSpawns[part] = data;
 
             local function onChildAdded(child)
                 if (child.Name == 'Occupied') then
+                    -- A fresh Occupied is a fresh drop, so it's worth trying again
                     data.occupied = true;
+                    data.visits = 0;
                 end;
             end;
 
@@ -1163,29 +1165,41 @@ do
         -- The server ignores a second PickUp on the same item this quickly
         local PICKUP_COOLDOWN = 1;
 
-        -- How long to stand on a trinket spawn, and how long before it's worth revisiting
+        --[[
+            How long to stand on a trinket spawn, how long before it's worth revisiting,
+            and how many tries it gets. The try limit matters: a spawn whose Occupied
+            never clears (someone else's drop, or one we simply can't take) would
+            otherwise have us teleporting between pedestals forever
+        ]]
         local TRINKET_VISIT_TIME = 0.35;
         local TRINKET_REVISIT_COOLDOWN = 2;
+        local TRINKET_MAX_VISITS = 3;
+
+        local function isWorthVisiting(part, data)
+            return data.occupied and part.Parent and data.visits < TRINKET_MAX_VISITS;
+        end;
+
+        local function hasPendingRewards()
+            for part, data in next, trinketSpawns do
+                if (isWorthVisiting(part, data)) then return true end;
+            end;
+
+            return false;
+        end;
 
         --[[
             Sweeps up what a boss dropped. Occupied trinket spawns come first since that
             value is the only reliable sign loot actually landed there, then anything
             that also registered as a normal pickupable gets asked for by id
         ]]
-        local function hasPendingRewards()
-            for part, data in next, trinketSpawns do
-                if (data.occupied and part.Parent) then return true end;
-            end;
-
-            return false;
-        end;
-
         local function collectRewardDrops(myRootPart)
             for part, data in next, trinketSpawns do
-                if (not data.occupied or not part.Parent) then continue end;
+                if (not isWorthVisiting(part, data)) then continue end;
                 if (os.clock() - data.lastVisitAt < TRINKET_REVISIT_COOLDOWN) then continue end;
 
                 data.lastVisitAt = os.clock();
+                data.visits += 1;
+
                 myRootPart.CFrame = CFrame.new(part.Position);
 
                 -- Standing on it is what makes the game hand the trinket over
@@ -1453,10 +1467,11 @@ do
         --[[
             Picks a living boss anywhere in the server, nearest first. Regular mobs are
             never worth the swings, and there's no range limit because we teleport onto
-            the target anyway. Picking a name in the boss list farms only that boss
+            the target anyway. Filter Bosses narrows it to the one picked in the list,
+            otherwise every boss is fair game and each still gets its own offsets
         ]]
         local function getFarmTarget(myPosition)
-            local wantedKey = bossKey(library.flags.autoFarmBoss);
+            local wantedKey = library.flags.filterBosses and bossKey(library.flags.autoFarmBoss) or '';
             local closest, closestDistance = nil, math.huge;
 
             for rootPart, kind in next, attachTargets do
@@ -1493,12 +1508,16 @@ do
             spend the gap between them drifting off the boss
         ]]
         function funcs.autoFarm(state)
-            if (not state) then
-                maid.autoFarm = nil;
-                maid.autoFarmHold = nil;
-                maid.autoFarmMovers = nil;
-                return;
-            end;
+            --[[
+                Tear the old run down before starting a new one. Toggling fast used to
+                leave the previous loop's movers behind, and their cleanup running after
+                the new pool started would hand AutoRotate back mid farm
+            ]]
+            maid.autoFarm = nil;
+            maid.autoFarmHold = nil;
+            maid.autoFarmMovers = nil;
+
+            if (not state) then return end;
 
             local movers = createMoverPool();
             local target;
@@ -1608,7 +1627,13 @@ do
                             rewardHardDeadline = os.clock() + REWARD_SPAWN_WAIT_MAX;
                         end;
 
-                        collectRewardDrops(myRootPart);
+                        --[[
+                            Only loot inside the window after a kill. Looting on any idle
+                            tick is what turned old occupied spawns into an endless tour
+                        ]]
+                        if (os.clock() < rewardHardDeadline) then
+                            collectRewardDrops(myRootPart);
+                        end;
                     end;
 
                     task.wait(AUTO_FARM_SWING_DELAY);
@@ -2235,18 +2260,23 @@ localCheats:AddDivider('Auto Farm');
 localCheats:AddToggle({
     text = 'Auto Farm',
     callback = funcs.autoFarm,
-    tip = 'Parks on the nearest living boss anywhere in the server and left clicks.'
+    tip = 'Parks on the nearest living boss anywhere in the server and left clicks. Loots what it kills.'
+});
+
+localCheats:AddToggle({
+    text = 'Filter Bosses',
+    tip = 'On, only the boss picked below gets farmed. Off, all of them do, each with its own offsets.'
 });
 
 --[[
-    Picks which boss to farm, and which boss the height/space sliders below belong to,
-    so you can tune a parking spot per boss and switch between them without losing the
-    last one. Nearest farms every boss and edits the offsets they all start on
+    Picks which boss the height/space sliders below belong to, so you can tune a parking
+    spot per boss and switch between them without losing the last one, and which boss to
+    farm when Filter Bosses is on. Nearest edits the offsets every boss starts on
 ]]
 localCheats:AddList({
     text = 'Auto Farm Boss',
     values = bossNames,
-    tip = 'The boss to farm, and the one the sliders below configure.',
+    tip = 'The boss the sliders below configure, and the one Filter Bosses locks onto.',
     callback = function(bossName)
         local heightSlider, spaceSlider = library.options.autoFarmHeight, library.options.autoFarmSpace;
 
