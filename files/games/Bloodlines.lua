@@ -65,10 +65,12 @@ local BOSS_SCAN_TIME = 8;
 local BOSS_HOP_TIME = 15;
 
 --[[
-    Trinkets drop a few seconds after the boss actually dies, so the farm loop hangs
-    around the corpse for this long instead of leaving for the next boss
+    Trinkets show up a few seconds after the boss actually dies, so the farm loop hangs
+    around the corpse for this long instead of leaving for the next boss. An occupied
+    trinket spawn keeps it there up to the max, in case the drop is late
 ]]
-local REWARD_SPAWN_WAIT = 10;
+local REWARD_SPAWN_WAIT = 12;
+local REWARD_SPAWN_WAIT_MAX = 35;
 
 --[[
     Safe Teleport. Animation ids we bail out on, filled from the Teleport Animation Ids
@@ -619,6 +621,9 @@ do
         local mobsList = {};
         local pickupList = {};
 
+        -- TrinketSpawn part -> {occupied, lastVisitAt}, filled from the boss rewards models
+        local trinketSpawns = {};
+
         -- rootPart -> 'player' | 'mob' | 'npc', so attach to back can filter by what you actually want
         local attachTargets = {};
 
@@ -1032,10 +1037,50 @@ do
         end);
 
         --[[
-            Killing a boss drops a <BossName>Rewards model with the loot nested under
-            TrinketSpawn parts, so those pickupables never hit workspace directly and
-            the item ESP / auto pickup would never see them
+            Killing a boss drops a <BossName>Rewards model holding TrinketSpawn parts.
+            A spawn only has loot on it once an Occupied value shows up underneath, and
+            that happens seconds after the death, so we watch for it instead of reading
+            the model once
         ]]
+        local function watchTrinketSpawn(part)
+            if (not IsA(part, 'BasePart') or not string.match(part.Name, '^TrinketSpawn')) then return end;
+
+            local data = {lastVisitAt = 0, occupied = false};
+            trinketSpawns[part] = data;
+
+            local function onChildAdded(child)
+                if (child.Name == 'Occupied') then
+                    data.occupied = true;
+                end;
+            end;
+
+            for _, child in next, part:GetChildren() do
+                onChildAdded(child);
+            end;
+
+            local connections = {
+                part.ChildAdded:Connect(onChildAdded),
+
+                -- Occupied going away means somebody already took it
+                part.ChildRemoved:Connect(function(child)
+                    if (child.Name == 'Occupied') then
+                        data.occupied = false;
+                    end;
+                end),
+
+                part.Destroying:Connect(function()
+                    trinketSpawns[part] = nil;
+                    maid[part] = nil;
+                end)
+            };
+
+            maid[part] = function()
+                for _, connection in next, connections do
+                    connection:Disconnect();
+                end;
+            end;
+        end;
+
         local function onRewardsAdded(model)
             local bossName = string.match(model.Name, '^(.+)Rewards$');
             if (not bossName) then return end;
@@ -1044,9 +1089,12 @@ do
             addBossName((string.gsub(bossName, '%s*[Bb]oss%s*$', '')));
 
             maid[model] = Utility.listenToDescendantAdded(model, function(object)
-                if (IsA(object, 'BasePart')) then
-                    task.spawn(onPickupableAdded, object, true);
-                end;
+                if (not IsA(object, 'BasePart')) then return end;
+
+                watchTrinketSpawn(object);
+
+                -- Anything under here that is a real pickupable gets an id we can ask for
+                task.spawn(onPickupableAdded, object, true);
             end);
 
             model.Destroying:Connect(function()
@@ -1115,11 +1163,38 @@ do
         -- The server ignores a second PickUp on the same item this quickly
         local PICKUP_COOLDOWN = 1;
 
+        -- How long to stand on a trinket spawn, and how long before it's worth revisiting
+        local TRINKET_VISIT_TIME = 0.35;
+        local TRINKET_REVISIT_COOLDOWN = 2;
+
         --[[
-            Sweeps up what a boss dropped. The PickUp remote is range checked server
-            side, so we walk the root part onto each trinket before asking for it
+            Sweeps up what a boss dropped. Occupied trinket spawns come first since that
+            value is the only reliable sign loot actually landed there, then anything
+            that also registered as a normal pickupable gets asked for by id
         ]]
+        local function hasPendingRewards()
+            for part, data in next, trinketSpawns do
+                if (data.occupied and part.Parent) then return true end;
+            end;
+
+            return false;
+        end;
+
         local function collectRewardDrops(myRootPart)
+            for part, data in next, trinketSpawns do
+                if (not data.occupied or not part.Parent) then continue end;
+                if (os.clock() - data.lastVisitAt < TRINKET_REVISIT_COOLDOWN) then continue end;
+
+                data.lastVisitAt = os.clock();
+                myRootPart.CFrame = CFrame.new(part.Position);
+
+                -- Standing on it is what makes the game hand the trinket over
+                task.wait(TRINKET_VISIT_TIME);
+
+                myRootPart = localPlayerData.rootPart;
+                if (not myRootPart or not library.flags.autoFarm) then return end;
+            end;
+
             for object, data in next, pickupList do
                 if (not data.isReward or not object.Parent) then continue end;
                 if (tick() - data.lastPickupAt < PICKUP_COOLDOWN) then continue end;
@@ -1428,8 +1503,13 @@ do
             local movers = createMoverPool();
             local target;
 
-            -- Set when the boss we were on dies, so we stay for the trinkets it owes us
+            --[[
+                Set when the boss we were on dies, so we stay for the trinkets it owes us.
+                Occupied spawns extend the wait, up to the hard deadline that keeps a spawn
+                we can't actually loot from parking us there forever
+            ]]
             local rewardDeadline = 0;
+            local rewardHardDeadline = 0;
             local hadTarget = false;
 
             maid.autoFarmMovers = function()
@@ -1466,7 +1546,8 @@ do
                     end;
 
                     -- While the last kill still owes us trinkets we don't go looking for a new boss
-                    local waitingForRewards = os.clock() < rewardDeadline;
+                    local waitingForRewards = os.clock() < rewardDeadline
+                        or (os.clock() < rewardHardDeadline and hasPendingRewards());
                     target = (not waitingForRewards) and myRootPart and getFarmTarget(myRootPart.Position) or nil;
 
                     if (isTakingCover()) then
@@ -1485,6 +1566,7 @@ do
                         if (hadTarget) then
                             hadTarget = false;
                             rewardDeadline = os.clock() + REWARD_SPAWN_WAIT;
+                            rewardHardDeadline = os.clock() + REWARD_SPAWN_WAIT_MAX;
                         end;
 
                         collectRewardDrops(myRootPart);
