@@ -54,8 +54,8 @@ local BOSS_NAMES = {
     dropped by the server. Fast enough to never miss a window, no slider needed
 ]]
 local AUTO_FARM_SWING_DELAY = 0.1;
-local AUTO_FARM_DEFAULT_HEIGHT = 8;
-local AUTO_FARM_DEFAULT_SPACE = 6;
+local AUTO_FARM_DEFAULT_HEIGHT = 0;
+local AUTO_FARM_DEFAULT_SPACE = 0;
 
 -- Sentinel row in the boss list that means 'whichever boss is closest'
 local AUTO_FARM_NEAREST = 'Nearest';
@@ -1512,8 +1512,47 @@ do
             local rewardHardDeadline = 0;
             local hadTarget = false;
 
+            -- True while we're sitting in the sky waiting on regen
+            local retreating = false;
+
             maid.autoFarmMovers = function()
                 movers.clear();
+            end;
+
+            --[[
+                Hovers straight up out of reach and stays there until we've healed back
+                past the resume threshold, instead of giving up on the farm entirely
+            ]]
+            local function retreatAndHeal(healthPercent)
+                retreating = true;
+                target = nil;
+
+                ToastNotif.new({text = string.format('Health at %d%%, pulling out to heal.', healthPercent), duration = 5});
+
+                local goalCF;
+
+                while (library.flags.autoFarm and library.flags.autoFarmRetreatOnLowHealth) do
+                    local rootPart = localPlayerData.rootPart;
+
+                    -- Died on the way out, the respawn handler takes it from here
+                    if (not rootPart) then break end;
+
+                    -- Anchored to where we first pulled out, so we don't drift up forever
+                    goalCF = goalCF or CFrame.new(rootPart.Position + Vector3.new(0, library.flags.autoFarmRetreatHeight, 0));
+
+                    movers.apply(rootPart, goalCF);
+                    rootPart.CFrame = goalCF;
+
+                    local _, _, currentHealth = Utility:getCharacter();
+                    if (not currentHealth or currentHealth >= library.flags.autoFarmResumeHealth) then break end;
+
+                    task.wait(0.25);
+                end;
+
+                retreating = false;
+                movers.clear();
+
+                ToastNotif.new({text = 'Healed up, back to farming.'});
             end;
 
             maid.autoFarmHold = RunService.Heartbeat:Connect(function()
@@ -1521,10 +1560,11 @@ do
                 if (not myRootPart or not target or not target.Parent) then return end;
 
                 --[[
-                    Mid safe teleport the movers keep us parked out of reach, and mid grip
-                    we need to stay on the body, so leave the position alone either way
+                    Mid safe teleport the movers keep us parked out of reach, mid grip we
+                    need to stay on the body, and mid retreat we're healing in the sky, so
+                    leave the position alone in all three cases
                 ]]
-                if (isTakingCover() or isGripping()) then return end;
+                if (isTakingCover() or isGripping() or retreating) then return end;
 
                 local offsets = getBossOffsets(target.Parent.Name);
                 local goalCF = getAttachCFrame(target.CFrame, offsets.height, offsets.space);
@@ -1538,11 +1578,10 @@ do
                     local myRootPart = localPlayerData.rootPart;
                     local _, _, healthPercent = Utility:getCharacter();
 
-                    -- Bail before swinging, otherwise we trade the last hit and die anyway
-                    if (library.flags.autoFarmHealthBail and healthPercent and healthPercent <= library.flags.autoFarmBailHealth) then
-                        ToastNotif.new({text = string.format('Auto Farm stopped, health dropped to %d%%.', healthPercent), duration = 5});
-                        library.options.autoFarm:SetState(false);
-                        break;
+                    -- Pull out before swinging, otherwise we trade the last hit and die anyway
+                    if (library.flags.autoFarmRetreatOnLowHealth and healthPercent and healthPercent <= library.flags.autoFarmRetreatHealth) then
+                        retreatAndHeal(healthPercent);
+                        continue;
                     end;
 
                     -- While the last kill still owes us trinkets we don't go looking for a new boss
@@ -2261,17 +2300,36 @@ localCheats:AddToggle({
 });
 
 localCheats:AddToggle({
-    text = 'Auto Farm Health Bail',
+    text = 'Auto Farm Retreat On Low Health',
     state = true,
-    tip = 'Turns Auto Farm off when your health drops below the threshold.'
+    tip = 'Hovers out of reach until you regen instead of stopping the farm.'
 });
 
 localCheats:AddSlider({
-    text = 'Auto Farm Bail Health',
+    text = 'Auto Farm Retreat Health',
     min = 5,
     value = 35,
     max = 95,
-    textpos = 2
+    textpos = 2,
+    tip = 'Health percent that sends you up to heal.'
+});
+
+localCheats:AddSlider({
+    text = 'Auto Farm Resume Health',
+    min = 10,
+    value = 90,
+    max = 100,
+    textpos = 2,
+    tip = 'Health percent to heal back to before dropping onto the boss again.'
+});
+
+localCheats:AddSlider({
+    text = 'Auto Farm Retreat Height',
+    min = 50,
+    value = 500,
+    max = 2000,
+    textpos = 2,
+    tip = 'How far straight up to hover while healing.'
 });
 
 localCheats:AddDivider('Auto Grip');
